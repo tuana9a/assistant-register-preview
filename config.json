@@ -1,0 +1,13 @@
+{
+    "server": {
+        "address": "127.0.0.1",
+        "port": "1426"
+    },
+    "database": {
+        "address": "127.0.0.1",
+        "port": "27017",
+        "username": "tuana9a",
+        "password": "Tuantai123",
+        "authSource": "hust-assistant"
+    }
+}

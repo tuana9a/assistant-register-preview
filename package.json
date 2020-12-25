@@ -1,0 +1,22 @@
+{
+  "name": "register-preview",
+  "version": "1.0.0",
+  "description": "A Web Service that provides preview class after register for HUST students to manage their time in studying",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gemdino/register-preview.git"
+  },
+  "author": "Nguyen Minh Tuan",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/gemdino/register-preview/issues"
+  },
+  "homepage": "https://github.com/gemdino/register-preview#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
