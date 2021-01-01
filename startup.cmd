@@ -1,0 +1,1 @@
+more favicon.txt && echo developed by tuana9a, gemdino,... && node .

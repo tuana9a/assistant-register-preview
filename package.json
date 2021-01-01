@@ -17,6 +17,7 @@
   },
   "homepage": "https://github.com/gemdino/register-preview#readme",
   "dependencies": {
+    "csv-parser": "^3.0.0",
     "express": "^4.17.1",
     "mongodb": "^3.6.3"
   }
