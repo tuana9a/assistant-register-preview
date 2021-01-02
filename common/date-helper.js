@@ -40,7 +40,7 @@ function daysBetween(date1 = new Date(), date2 = new Date()) {
 }
 function weeksFromTo(date1 = new Date(), date2 = new Date()) {
     let days = daysBetween(date1, date2);
-    return (days / 7 + 1);
+    return Math.floor(days / 7 + 1);
 }
 
 module.exports.dateToDash = dateToDash;

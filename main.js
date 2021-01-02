@@ -544,6 +544,7 @@ async function dbUpsertRegisterClass(term, csvName) {
     try {
         let promises = [];
         let maLopSet = new Set();
+
         await new Promise((resolve, reject) => {
             try {
                 csv_helper.readAsync(PATH_INFO.uploadFolder + "/" + csvName, (row) => {
@@ -566,7 +567,8 @@ async function dbUpsertRegisterClass(term, csvName) {
                                 thuHoc: row["#thuHoc"],
                                 phongHoc: row["#phongHoc"],
                                 thoiGianHoc: row["#thoiGianHoc"],
-                                tuanHoc: row["#tuanHoc"]
+                                tuanHoc: row["#tuanHoc"],
+                                _timestamp: Date.now()
                             };
 
                             let insertResult = await dbInsertOne(term, {
@@ -585,7 +587,6 @@ async function dbUpsertRegisterClass(term, csvName) {
                         }
                     }).catch(log_helper.error));
                 }, resolve);
-
             } catch (e) {
                 reject(e);
             }
@@ -594,7 +595,7 @@ async function dbUpsertRegisterClass(term, csvName) {
         await Promise.all(promises);
         promises = [];
 
-        let insertedCount = 0;
+        let count = 0;
         maLopSet.forEach((maLop) => {
             promises.push(new Promise(async (resolve, reject) => {
                 let findResult = await dbFindMany(term, [maLop]);
@@ -606,25 +607,36 @@ async function dbUpsertRegisterClass(term, csvName) {
                         result.body.push("Error: maLop: " + maLop + " insert failed");
                         break;
                     case 1://EXPLAIN: insert success but only 1 buoiHoc
-                        insertedCount++;
+                        count++;
                         break;
                     default://EXPLAIN: insert success has >= 2 buoiHoc
+                        count++;
                         let deletedResult = await dbDeleteMany(term, maLop);
                         if (!deletedResult.success) {
                             result.body.push("Error: maLop: " + maLop + " delete to combine failed");
                             break;
                         }
-                        let combinedClass = existClasses.reduce((total, lopHoc, index) => {
+                        let lopHocMain = existClasses.reduce((total, lopHoc, index) => {
                             if (index == 0) return total;
-                            total.cacBuoiHoc.push(lopHoc.cacBuoiHoc[0]);
+                            for (let buoiHoc of lopHoc.cacBuoiHoc) {
+                                let buoiHocExist = false;
+                                total.cacBuoiHoc.forEach((buoiHocMain, index) => {
+                                    if (buoiHocMain.name == buoiHoc.name) {
+                                        buoiHocExist = true;
+                                        if (buoiHoc._timestamp >= buoiHocMain._timestamp) {
+                                            total.cacBuoiHoc[index] = buoiHoc;
+                                        }
+                                    }
+                                });
+                                if (!buoiHocExist) total.cacBuoiHoc.push(buoiHoc);
+                            }
                             return total;
                         }, existClasses[0]);
-                        let reinsertResult = await dbInsertOne(term, combinedClass);
+                        let reinsertResult = await dbInsertOne(term, lopHocMain);
                         if (!reinsertResult.success) {
                             result.body.push("Error: maLop: " + maLop + " insert after combine failed");
                             break;
                         }
-                        insertedCount++;
                         break;
                 }
 
@@ -633,7 +645,7 @@ async function dbUpsertRegisterClass(term, csvName) {
         });
 
         await Promise.all(promises);
-        result.body.push("Done: count=" + insertedCount);
+        result.body.push("Done: count=" + count);
 
     } catch (e) {
         log_helper.error(e);
@@ -664,7 +676,7 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
     }
     try {
         let promises = [];
-        let updateCount = 0;
+        let maLopSet = new Set();
 
         await new Promise((resolve, reject) => {
             try {
@@ -673,6 +685,8 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
                         try {
                             let maLop = reformatString(row["#maLop"]);
                             let tenNhom = reformatString(row["#tenNhom"]);
+                            let tuanThiEnd = row["#tuanThi"];
+                            let tuanThiMid = "T" + date_helper.weeksFromTo(date_helper.dashToDate(startDayYear), date_helper.dotToDate(row["#ngayThi"]));
 
                             let lopHocNew = {
                                 maLop: maLop,
@@ -686,41 +700,32 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
                                 ngayThi: row["#ngayThi"],
                                 kipThi: row["#kipThi"],
                                 phongThi: row["#phongThi"],
-                                tuanThi: end ? row["#tuanThi"] : "T" +
-                                    date_helper.weeksFromTo(date_helper.dashToDate(startDayYear), date_helper.dotToDate(row["#ngayThi"]))
+                                tuanThi: end ? tuanThiEnd : tuanThiMid,
+                                _timestamp: Date.now()
                             };
 
                             let findResult = await dbFindMany(term, [maLop]);
                             let existClasses = findResult.body;
-                            // console.log(maLop + " " + existClasses.length + " " + JSON.stringify(existClasses[0]));
 
                             switch (existClasses.length) {
                                 case 0://EXPLAIN: not exist, so update failed
                                     result.body.push("Error: maLop: " + maLop + " not exist");
                                     break;
                                 case 1://EXPLAIN: success only 1 found
+                                    maLopSet.add(maLop);
                                     let studyClass = existClasses[0];
-                                    cacNhomThi = end ? studyClass.thiCuoiKi : studyClass.thiGiuaKi;
-                                    if (!cacNhomThi.some((nhomThi) => {
-                                        let same = nhomThi.name == nhomThiNew.name;
-                                        if (same) nhomThi = nhomThiNew;
-                                        return same;
-                                    })) {
-                                        cacNhomThi.push(nhomThiNew);
-                                    }
+                                    let insertEntry =
+                                        end ? { ...studyClass, thiCuoiKi: [nhomThiNew] } : { ...studyClass, thiGiuaKi: [nhomThiNew] };
 
-                                    let updateResult = await dbUpdateMany(term, maLop, studyClass);
-                                    if (!updateResult.success) {
-                                        result.body.push("Error: maLop: " + maLop + " update failed");
-                                        break;
+                                    let insertResult = await dbInsertOne(term, insertEntry);
+                                    if (!insertResult.success) {
+                                        result.body.push(insertResult);
                                     }
-                                    updateCount++;
                                     break;
                                 default://EXPLAIN: insert success has >= 2 buoiHoc
                                     result.body.push("Error: maLop: " + maLop + " duplicate");
                                     break;
                             }
-
                             resolve();
 
                         } catch (e) {
@@ -737,7 +742,59 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
         await Promise.all(promises);
         promises = [];
 
-        result.body.push("Done: count=" + updateCount);
+        let count = 0;
+        maLopSet.forEach((maLop) => {
+            promises.push(new Promise(async (resolve, reject) => {
+                let findResult = await dbFindMany(term, [maLop]);
+                let existClasses = findResult.body;
+                // console.log(maLop + " " + existClasses.length + " " + JSON.stringify(existClasses[0]));
+
+                switch (existClasses.length) {
+                    case 0://EXPLAIN: not exist, so insert failed
+                        result.body.push("Error: maLop: " + maLop + " insert failed");
+                        break;
+                    case 1://EXPLAIN: insert success but only 1 buoiHoc
+                        count++;
+                        break;
+                    default://EXPLAIN: insert success has >= 2 buoiHoc
+                        count++;
+                        let deletedResult = await dbDeleteMany(term, maLop);
+                        if (!deletedResult.success) {
+                            result.body.push("Error: maLop: " + maLop + " delete to combine failed");
+                            break;
+                        }
+                        let lopHocMain = existClasses.reduce((total, lopHoc, index) => {
+                            if (index == 0) return total;
+                            let totalCacNhomThi = end ? total.thiCuoiKi : total.thiGiuaKi;
+                            let cacNhomThi = end ? lopHoc.thiCuoiKi : lopHoc.thiGiuaKi;
+                            for (let nhomThi of cacNhomThi) {
+                                let nhomThiExist = false;
+                                totalCacNhomThi.forEach((nhomThiMain, index) => {
+                                    if (nhomThiMain.name == nhomThi.name) {
+                                        nhomThiExist = true;
+                                        if (nhomThi._timestamp >= nhomThiMain._timestamp) {
+                                            totalCacNhomThi[index] = nhomThi;
+                                        }
+                                    }
+                                });
+                                if (!nhomThiExist) totalCacNhomThi.push(nhomThi);
+                            }
+                            return total;
+                        }, existClasses[0]);
+                        let reinsertResult = await dbInsertOne(term, lopHocMain);
+                        if (!reinsertResult.success) {
+                            result.body.push("Error: maLop: " + maLop + " insert after combine failed");
+                            break;
+                        }
+                        break;
+                }
+
+                resolve();
+            }));
+        });
+
+        await Promise.all(promises);
+        result.body.push("Done: count=" + count);
 
     } catch (e) {
         log_helper.error(e);
