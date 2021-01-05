@@ -62,8 +62,7 @@ async function initServer() {
         resp.write('<h1 style="font-family:cursive; text-align:center">Hello World! 🙄</h1>');
         resp.end();
     });
-
-
+    
     app.get('/api/public/find/Class', async function (req, resp) {
         let classIds = req.query.ids.trim().replace(/",\s*,/, ",").split(/\s*,\s*|\s+/);
         let term = req.query.term;
@@ -83,17 +82,6 @@ async function initServer() {
         resp.write(JSON.stringify(result));
         resp.end();
     });
-
-
-    app.put('/api/admin/reformat/Class', async function (req, resp) {
-        let term = req.query.term;
-
-        let result = await dbReformatAll(term);
-
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
-        resp.end();
-    });
     app.get('/api/admin/duplicate/Class', async function (req, resp) {
         let term = req.query.term;
 
@@ -103,35 +91,23 @@ async function initServer() {
         resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.delete('/api/admin/clear/Class', async function (req, resp) {
-        let term = req.query.term;
 
-        let result = await dbClearAll(term);
-
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
-        resp.end();
-    });
-
-
-    app.post('/api/admin/upsert/RegisterClass', async function (req, resp) {
-        // console.log(req.body);
+    app.put('/api/admin/reformat/Class', async function (req, resp) {
         let term = req.body.term;
-        let csvName = req.body.csvName;
 
-        let result = await dbUpsertRegisterClass(term, csvName);
+        let result = await dbReformatAll(term);
 
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
         resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.put('/api/admin/upsert/ExamSchedule', async function (req, resp) {
-        // console.log(req.body);
+    app.put('/api/admin/upsert/Exam', async function (req, resp) {
         let term = req.body.term;
         let startDayYear = req.body.startDayYear;
         let csvName = req.body.csvName;
         let whichExam = req.body.whichExam;
         let result = {};
+
         switch (whichExam) {
             case "mid":
                 result = await dbUpsertExamSchedule(term, startDayYear, false, csvName);
@@ -143,10 +119,54 @@ async function initServer() {
                 result.body = "unknow param whichExam";
                 break;
         }
+
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
         resp.write(JSON.stringify(result));
         resp.end();
     });
+    
+    app.delete('/api/admin/clear/Class', async function (req, resp) {
+        let term = req.query.term;
+
+        let result = await dbClearAll(term);
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+    app.delete('/api/admin/clear/Exam', async function (req, resp) {
+        let term = req.query.term;
+        let whichExam = req.query.whichExam;
+        let result = {};
+
+        switch (whichExam) {
+            case "mid":
+                result = await dbClearExamSchedule(term, false);
+                break;
+            case "end":
+                result = await dbClearExamSchedule(term, true);
+                break;
+            default:
+                result.body = "unknow param whichExam";
+                break;
+        }
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+
+    app.post('/api/admin/upsert/Class', async function (req, resp) {
+        let term = req.body.term;
+        let csvName = req.body.csvName;
+
+        let result = await dbUpsertRegisterClass(term, csvName);
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+
 
     return new Promise((resolve, reject) => {
         try {
@@ -382,6 +402,58 @@ async function dbFindDuplicate(term = "") {
 
         result.body.count = duplicateCount;
         result.body.cases = duplicateCases;
+
+    } catch (e) {
+        log_helper.error(e);
+        result.success = false;
+        result.body = e;
+    }
+    databaseIntense = false;
+    return result;
+}
+async function dbClearExamSchedule(term = "", end = true) {
+    let result = {
+        success: true,
+        body: -1
+    }
+    if (term == undefined || term == "" || term.search(/^\d+.+$/) == -1) {
+        result.success = false;
+        result.body = "Error: Parameter: term: " + term;
+        return result;
+    }
+    if (databaseIntense) {
+        result.success = false;
+        result.body = "NOPE: database intense";
+        return result;
+    }
+    try {
+        let collection = databaseClient.collection(`${term}-register-class`);
+        let cursor = collection.find();
+        let count = 0;
+        let promises = [];
+        databaseIntense = true;
+        await cursor.forEach(async (studyClass) => {
+            let maLop = studyClass.maLop;
+            let promise = new Promise((resolve, reject) => {
+                try {
+                    let filter = { maLop: maLop };
+                    let update = { $set: end ? { thiCuoiKi: [] } : { thiGiuaKi: [] } };
+                    collection.updateMany(filter, update, (err, result) => {
+                        if (err) {
+                            reject("MaLop: " + maLop + ", " + err);
+                            return;
+                        }
+                        count += result.matchedCount;
+                        resolve();
+                    });
+                } catch (e) {
+                    reject("MaLop: " + maLop + ", " + e);
+                }
+            }).catch(log_helper.error);
+            promises.push(promise);
+        });
+        await Promise.all(promises);
+        result.body = count;
 
     } catch (e) {
         log_helper.error(e);

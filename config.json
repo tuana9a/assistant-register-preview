@@ -7,7 +7,7 @@
         "port": "27017",
         "username": "tuana9a",
         "password": "Tuantai123",
-        "authSource": "hust-assistant"
+        "authSource": "register-preview"
     },
     "path" : {
         "uploadFolder": "D:/GemDino/WEB-RESOURCE/register-preview/csv-register-class"
