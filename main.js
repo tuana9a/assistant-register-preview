@@ -1,27 +1,44 @@
+
 const fs = require("fs");
 const express = require("express");
+const axios = require("axios").default;
 const { MongoClient } = require("mongodb");
 
 const log_helper = require("./common/log-helper");
 const csv_helper = require("./common/csv-helper");
 const date_helper = require("./common/date-helper");
 
-const PATH_INFO = {
-    uploadFolder: ""
+const INFO = {
+    server: {
+        port: -1
+    },
+    database: {
+        address: "",
+        port: "",
+        username: "",
+        password: "",
+        authSource: "",
+    },
+    coreService: {
+        address: "",
+        port: "",
+        resource: "",
+    },
+    path: {
+        resourceFolder: "/resource"
+    }
 }
-const SERVER_INFO = {
-    port: -1,
-}
-const DATABASE_INFO = {
-    address: "",
-    port: "",
-    username: "",
-    password: "",
-    authSource: "",
-}
+
 let mongoClient;
 let databaseClient;
 let databaseIntense = false;
+
+function lockDatabase() {
+    databaseIntense = true;
+}
+function releaseDatabase() {
+    databaseIntense = false;
+}
 
 
 //SECTION: I/O
@@ -35,15 +52,10 @@ async function loadConfig() {
             try {
                 let config = JSON.parse(data);
 
-                PATH_INFO.uploadFolder = config.path.uploadFolder;
-
-                SERVER_INFO.port = config.server.port;
-
-                DATABASE_INFO.address = config.database.address;
-                DATABASE_INFO.port = config.database.port;
-                DATABASE_INFO.username = config.database.username;
-                DATABASE_INFO.password = config.database.password;
-                DATABASE_INFO.authSource = config.database.authSource;
+                INFO.path = config.path;
+                INFO.coreService = config.coreService;
+                INFO.server = config.server;
+                INFO.database = config.database;
 
                 resolve();
             } catch (e) {
@@ -57,12 +69,9 @@ async function initServer() {
     app.use(express.json());
 
     app.get('/', function (req, resp) {
-        resp.setHeader("Content-Type", "text/html;charset=utf-8");
-        resp.write('<h1 style="font-family:cursive; text-align:center">Register Preview</h1>');
-        resp.write('<h1 style="font-family:cursive; text-align:center">Hello World! 🙄</h1>');
         resp.end();
     });
-    
+
     app.get('/api/public/find/Class', async function (req, resp) {
         let classIds = req.query.ids.trim().replace(/",\s*,/, ",").split(/\s*,\s*|\s+/);
         let term = req.query.term;
@@ -76,101 +85,106 @@ async function initServer() {
     app.get('/api/public/count/Class', async function (req, resp) {
         let term = req.query.term;
 
-        let result = await dbCountAll(term);
-
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
+        resp.write(JSON.stringify({ success: true }));
         resp.end();
+
+        let result = await dbCountAll(term);
     });
     app.get('/api/admin/duplicate/Class', async function (req, resp) {
         let term = req.query.term;
 
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify({ success: true }));
+        resp.end();
+
         let result = await dbFindDuplicate(term);
-
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
-        resp.end();
-    });
-
-    app.put('/api/admin/reformat/Class', async function (req, resp) {
-        let term = req.body.term;
-
-        let result = await dbReformatAll(term);
-
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
-        resp.end();
-    });
-    app.put('/api/admin/upsert/Exam', async function (req, resp) {
-        let term = req.body.term;
-        let startDayYear = req.body.startDayYear;
-        let csvName = req.body.csvName;
-        let whichExam = req.body.whichExam;
-        let result = {};
-
-        switch (whichExam) {
-            case "mid":
-                result = await dbUpsertExamSchedule(term, startDayYear, false, csvName);
-                break;
-            case "end":
-                result = await dbUpsertExamSchedule(term, startDayYear, true, csvName);
-                break;
-            default:
-                result.body = "unknow param whichExam";
-                break;
-        }
-
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
-        resp.end();
-    });
-    
-    app.delete('/api/admin/clear/Class', async function (req, resp) {
-        let term = req.query.term;
-
-        let result = await dbClearAll(term);
-
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
-        resp.end();
-    });
-    app.delete('/api/admin/clear/Exam', async function (req, resp) {
-        let term = req.query.term;
-        let whichExam = req.query.whichExam;
-        let result = {};
-
-        switch (whichExam) {
-            case "mid":
-                result = await dbClearExamSchedule(term, false);
-                break;
-            case "end":
-                result = await dbClearExamSchedule(term, true);
-                break;
-            default:
-                result.body = "unknow param whichExam";
-                break;
-        }
-
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
-        resp.end();
     });
 
     app.post('/api/admin/upsert/Class', async function (req, resp) {
         let term = req.body.term;
         let csvName = req.body.csvName;
 
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify({ success: true }));
+        resp.end();
+
         let result = await dbUpsertRegisterClass(term, csvName);
+        // console.log("result : " + JSON.stringify(result));
+        // console.log("finish : " + new Date());
+        // console.log("======================");
+    });
+
+    app.put('/api/admin/reformat/Class', async function (req, resp) {
+        let term = req.body.term;
 
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify(result));
+        resp.write(JSON.stringify({ success: true }));
         resp.end();
+
+        let result = await dbReformatAll(term);
+    });
+    app.put('/api/admin/upsert/MidExam', async function (req, resp) {
+        let term = req.body.term;
+        let startDayYear = req.body.startDayYear;
+        let csvName = req.body.csvName;
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify({ success: true }));
+        resp.end();
+
+        let result = await dbUpsertExamSchedule(term, startDayYear, false, csvName);
+        // console.log("result : " + JSON.stringify(result));
+        // console.log("finish : " + new Date());
+        // console.log("======================");
+    });
+    app.put('/api/admin/upsert/EndExam', async function (req, resp) {
+        let term = req.body.term;
+        let startDayYear = req.body.startDayYear;
+        let csvName = req.body.csvName;
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify({ success: true }));
+        resp.end();
+
+        let result = await dbUpsertExamSchedule(term, startDayYear, true, csvName);
+        // console.log("result : " + JSON.stringify(result));
+        // console.log("finish : " + new Date());
+        // console.log("======================");
+    });
+
+    app.delete('/api/admin/clear/Class', async function (req, resp) {
+        let term = req.query.term;
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify({ success: true }));
+        resp.end();
+
+        let result = await dbClearAll(term);
+    });
+    app.delete('/api/admin/clear/MidExam', async function (req, resp) {
+        let term = req.query.term;
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify({ success: true }));
+        resp.end();
+
+        let result = await dbClearExamSchedule(term, false);
+    });
+    app.delete('/api/admin/clear/EndExam', async function (req, resp) {
+        let term = req.query.term;
+
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        resp.write(JSON.stringify({ success: true }));
+        resp.end();
+
+        let result = await dbClearExamSchedule(term, true);
     });
 
 
     return new Promise((resolve, reject) => {
         try {
-            const server = app.listen(SERVER_INFO.port, function () {
+            const server = app.listen(process.env.PORT || INFO.server.port, function () {
                 let port = server.address().port;
                 console.log("server start at http://%s:%s", "127.0.0.1", port);
                 resolve();
@@ -184,21 +198,25 @@ async function initServer() {
 async function connectDatabase() {
     return new Promise(async (resolve, reject) => {
 
-        let username = encodeURIComponent(DATABASE_INFO.username);
-        let password = encodeURIComponent(DATABASE_INFO.password);
-        let address = DATABASE_INFO.address;
-        let port = DATABASE_INFO.port;
-        let authSource = DATABASE_INFO.authSource;
-        let conectionString = `mongodb://${username}:${password}@${address}:${port}/?authSource=${authSource}&poolSize=8`;
+        let username = encodeURIComponent(INFO.database.username);
+        let password = encodeURIComponent(INFO.database.password);
+        let address = INFO.database.address;
+        let port = INFO.database.port;
+        let authSource = INFO.database.authSource;
 
-        mongoClient = new MongoClient(conectionString, { useUnifiedTopology: true });
+        //EXPLAIN: local
+        // let conectionString = `mongodb://${username}:${password}@${address}:${port}/?authSource=${authSource}&poolSize=8`;
+        // mongoClient = new MongoClient(conectionString, { useUnifiedTopology: true });
+
+        //EXPLAIN: remote
+        let conectionString = `mongodb+srv://${username}:${password}@${address}/register-preview?retryWrites=true&w=majority`;
+        mongoClient = new MongoClient(conectionString, { useNewUrlParser: true, useUnifiedTopology: true });
+
         try {
-            // Connect the client to the server
-            await mongoClient.connect();
-            // Establish and verify connection
-            await mongoClient.db("admin").command({ ping: 1 });
+            await mongoClient.connect();// Connect the client to the server
+            await mongoClient.db("admin").command({ ping: 1 });// Establish and verify connection
             databaseClient = mongoClient.db("register-preview");
-            // let result = await databaseClient.collection("").deleteMany({}); result.deletedCount;
+            // let result = await databaseClient.collection("").find({}); result.deletedCount;
             resolve();
 
         } catch (e) {
@@ -210,6 +228,36 @@ async function disconnectDatabase() {
     if (mongoClient != undefined && mongoClient != null) {
         await client.close();
     }
+}
+async function downloadFile(url = "", outputPath = "") {
+    const writer = fs.createWriteStream(outputPath);
+
+    return axios({
+        method: 'get',
+        url: url,
+        responseType: 'stream',
+    }).then(response => {
+
+        //ensure that the user can call `then()` only when the file has
+        //been downloaded entirely.
+
+        return new Promise((resolve, reject) => {
+            response.data.pipe(writer);
+            let error = null;
+            writer.on('error', err => {
+                error = err;
+                writer.close();
+                reject(err);
+            });
+            writer.on('close', () => {
+                if (!error) {
+                    resolve(true);
+                }
+                //no need to call the reject here, as it will have been called in the
+                //'error' stream;
+            });
+        });
+    });
 }
 
 
@@ -306,6 +354,8 @@ async function dbCountAll(term = "") {
     return result;
 }
 
+
+//SECTION: lock, release database
 async function dbReformatAll(term = "") {
     let result = {
         success: true,
@@ -321,12 +371,12 @@ async function dbReformatAll(term = "") {
         result.body = "NOPE: database intense";
         return result;
     }
+    lockDatabase();
     try {
         let collection = databaseClient.collection(`${term}-register-class`);
         let cursor = collection.find();
         let reformatCount = 0;
         let promises = [];
-        databaseIntense = true;
         await cursor.forEach(async (studyClass) => {
             let maLop = studyClass.maLop;
             let promise = new Promise((resolve, reject) => {
@@ -358,7 +408,7 @@ async function dbReformatAll(term = "") {
         result.success = false;
         result.body = e;
     }
-    databaseIntense = false;
+    releaseDatabase();
     return result;
 }
 async function dbFindDuplicate(term = "") {
@@ -376,13 +426,13 @@ async function dbFindDuplicate(term = "") {
         result.body = "NOPE: database intense";
         return result;
     }
+    lockDatabase();
     try {
         let collection = databaseClient.collection(`${term}-register-class`);
         let cursor = collection.find();
         let duplicateCount = 0;
         let duplicateCases = [];
         let promises = [];
-        databaseIntense = true;
         await cursor.forEach(async (studyClass) => {
             let promise = new Promise(async (resolve, reject) => {
                 let maLop = studyClass.maLop;
@@ -408,7 +458,7 @@ async function dbFindDuplicate(term = "") {
         result.success = false;
         result.body = e;
     }
-    databaseIntense = false;
+    releaseDatabase();
     return result;
 }
 async function dbClearExamSchedule(term = "", end = true) {
@@ -426,12 +476,12 @@ async function dbClearExamSchedule(term = "", end = true) {
         result.body = "NOPE: database intense";
         return result;
     }
+    lockDatabase();
     try {
         let collection = databaseClient.collection(`${term}-register-class`);
         let cursor = collection.find();
         let count = 0;
         let promises = [];
-        databaseIntense = true;
         await cursor.forEach(async (studyClass) => {
             let maLop = studyClass.maLop;
             let promise = new Promise((resolve, reject) => {
@@ -460,7 +510,7 @@ async function dbClearExamSchedule(term = "", end = true) {
         result.success = false;
         result.body = e;
     }
-    databaseIntense = false;
+    releaseDatabase();
     return result;
 }
 async function dbClearAll(term = "") {
@@ -478,11 +528,10 @@ async function dbClearAll(term = "") {
         result.body = "NOPE: database intense";
         return result;
     }
+    lockDatabase();
     try {
         let collection = databaseClient.collection(`${term}-register-class`);
-        databaseIntense = true;
         let deleteResult = await collection.deleteMany({});
-
         result.body.count = deleteResult.deletedCount;
 
     } catch (e) {
@@ -490,7 +539,7 @@ async function dbClearAll(term = "") {
         result.success = false;
         result.body = e;
     }
-    databaseIntense = false;
+    releaseDatabase();
     return result;
 }
 
@@ -510,9 +559,9 @@ async function dbInsertOne(term = "", studyClass = {}) {
         return result;
     }
     try {
-        delete studyClass._id;
-
         let collection = databaseClient.collection(`${term}-register-class`);
+
+        delete studyClass._id;
         let insertResult = await collection.insertOne(studyClass);
 
         result.body.insertedId = insertResult.insertedId;
@@ -593,6 +642,9 @@ async function dbDeleteMany(term = "", maLop = "") {
     }
     return result;
 }
+
+
+//SECTION: lock, release database
 async function dbUpsertRegisterClass(term, csvName) {
     let result = {
         success: true,
@@ -613,55 +665,58 @@ async function dbUpsertRegisterClass(term, csvName) {
         result.body = "NOPE: database intense";
         return result;
     }
+    lockDatabase();
     try {
         let promises = [];
         let maLopSet = new Set();
+        let collection = databaseClient.collection(`${term}-register-class`);
 
-        await new Promise((resolve, reject) => {
-            try {
-                csv_helper.readAsync(PATH_INFO.uploadFolder + "/" + csvName, (row) => {
-                    promises.push(new Promise(async (resolve, reject) => {
-                        try {
-                            let maLop = reformatString(row["#maLop"]);
-                            let buoiHocSo = reformatString(row["#buoiHocSo"]);
+        let coreService = INFO.coreService;
+        let url = `http://${coreService.address}:${coreService.port}${coreService.resource}?path=/register-preview/${csvName}`;
+        await downloadFile(url, INFO.path.resourceFolder + "/" + csvName);
 
-                            maLopSet.add(maLop);
+        await new Promise(async (resolve, reject) => {
+            csv_helper.readAsync(INFO.path.resourceFolder + "/" + csvName, (row) => {
+                promises.push(new Promise(async (resolve, reject) => {
+                    try {
+                        let maLop = reformatString(row["#maLop"]);
+                        let buoiHocSo = reformatString(row["#buoiHocSo"]);
 
-                            let lopHocNew = {
-                                maLop: maLop,
-                                loaiLop: row["#loaiLop"],
-                                maHocPhan: row["#maHocPhan"],
-                                tenHocPhan: row["#tenHocPhan"],
-                                ghiChu: row["#ghiChu"]
-                            };
-                            let buoiHocNew = {
-                                name: buoiHocSo,
-                                thuHoc: row["#thuHoc"],
-                                phongHoc: row["#phongHoc"],
-                                thoiGianHoc: row["#thoiGianHoc"],
-                                tuanHoc: row["#tuanHoc"],
-                                _timestamp: Date.now()
-                            };
+                        maLopSet.add(maLop);
 
-                            let insertResult = await dbInsertOne(term, {
-                                ...lopHocNew,
-                                cacBuoiHoc: [buoiHocNew],
-                                thiGiuaKi: [],
-                                thiCuoiKi: [],
-                            });
-                            if (!insertResult.success) {
-                                result.body.push(insertResult);
-                            }
-                            resolve();
+                        let lopHocNew = {
+                            maLop: maLop,
+                            loaiLop: row["#loaiLop"],
+                            maHocPhan: row["#maHocPhan"],
+                            tenHocPhan: row["#tenHocPhan"],
+                            ghiChu: row["#ghiChu"]
+                        };
+                        let buoiHocNew = {
+                            name: buoiHocSo,
+                            thuHoc: row["#thuHoc"],
+                            phongHoc: row["#phongHoc"],
+                            thoiGianHoc: row["#thoiGianHoc"],
+                            tuanHoc: row["#tuanHoc"],
+                            _timestamp: Date.now()
+                        };
 
-                        } catch (e) {
-                            reject("MaLop: " + maLop + ", " + e);
+                        delete lopHocNew._id;
+                        let insertResult = await collection.insertOne({
+                            ...lopHocNew,
+                            cacBuoiHoc: [buoiHocNew],
+                            thiGiuaKi: [],
+                            thiCuoiKi: [],
+                        });
+                        if (insertResult.insertedCount == 0) {
+                            result.body.push(insertResult);
                         }
-                    }).catch(log_helper.error));
-                }, resolve);
-            } catch (e) {
-                reject(e);
-            }
+                        resolve();
+
+                    } catch (e) {
+                        reject("MaLop: " + maLop + ", " + e);
+                    }
+                }).catch(log_helper.error));
+            }, resolve);
         }).catch(log_helper.error);
 
         await Promise.all(promises);
@@ -670,9 +725,10 @@ async function dbUpsertRegisterClass(term, csvName) {
         let count = 0;
         maLopSet.forEach((maLop) => {
             promises.push(new Promise(async (resolve, reject) => {
-                let findResult = await dbFindMany(term, [maLop]);
-                let existClasses = findResult.body;
-                // console.log(maLop + " " + existClasses.length + " " + JSON.stringify(existClasses[0]));
+                let existClasses = [];
+                await collection.find({ maLop: maLop }).forEach(e => {
+                    existClasses.push(e);
+                });
 
                 switch (existClasses.length) {
                     case 0://EXPLAIN: not exist, so insert failed
@@ -683,8 +739,8 @@ async function dbUpsertRegisterClass(term, csvName) {
                         break;
                     default://EXPLAIN: insert success has >= 2 buoiHoc
                         count++;
-                        let deletedResult = await dbDeleteMany(term, maLop);
-                        if (!deletedResult.success) {
+                        let deletedResult = await collection.deleteMany({ maLop: maLop });
+                        if (deletedResult.deletedCount == 0) {
                             result.body.push("Error: maLop: " + maLop + " delete to combine failed");
                             break;
                         }
@@ -704,8 +760,10 @@ async function dbUpsertRegisterClass(term, csvName) {
                             }
                             return total;
                         }, existClasses[0]);
-                        let reinsertResult = await dbInsertOne(term, lopHocMain);
-                        if (!reinsertResult.success) {
+
+                        delete lopHocMain._id;
+                        let reinsertResult = await collection.insertOne(lopHocMain);
+                        if (reinsertResult.insertedCount == 0) {
                             result.body.push("Error: maLop: " + maLop + " insert after combine failed");
                             break;
                         }
@@ -724,6 +782,7 @@ async function dbUpsertRegisterClass(term, csvName) {
         result.success = false;
         result.body = e;
     }
+    releaseDatabase();
     return result;
 }
 async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
@@ -746,69 +805,72 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
         result.body = "NOPE: database intense";
         return result;
     }
+    lockDatabase();
     try {
         let promises = [];
         let maLopSet = new Set();
+        let collection = databaseClient.collection(`${term}-register-class`);
 
-        await new Promise((resolve, reject) => {
-            try {
-                csv_helper.readAsync(PATH_INFO.uploadFolder + "/" + csvName, (row) => {
-                    promises.push(new Promise(async (resolve, reject) => {
-                        try {
-                            let maLop = reformatString(row["#maLop"]);
-                            let tenNhom = reformatString(row["#tenNhom"]);
-                            let tuanThiEnd = row["#tuanThi"];
-                            let tuanThiMid = "T" + date_helper.weeksFromTo(date_helper.dashToDate(startDayYear), date_helper.dotToDate(row["#ngayThi"]));
+        let coreService = INFO.coreService;
+        let url = `http://${coreService.address}:${coreService.port}${coreService.resource}?path=/register-preview/${csvName}`;
+        await downloadFile(url, INFO.path.resourceFolder + "/" + csvName);
 
-                            let lopHocNew = {
-                                maLop: maLop,
-                                maHocPhan: row["#maHocPhan"],
-                                tenHocPhan: row["#tenHocPhan"],
-                                ghiChu: row["#ghiChu"]
-                            };
-                            let nhomThiNew = {
-                                name: tenNhom,
-                                thuThi: row["#thuThi"],
-                                ngayThi: row["#ngayThi"],
-                                kipThi: row["#kipThi"],
-                                phongThi: row["#phongThi"],
-                                tuanThi: end ? tuanThiEnd : tuanThiMid,
-                                _timestamp: Date.now()
-                            };
+        await new Promise(async (resolve, reject) => {
+            csv_helper.readAsync(INFO.path.resourceFolder + "/" + csvName, (row) => {
+                promises.push(new Promise(async (resolve, reject) => {
+                    try {
+                        let maLop = reformatString(row["#maLop"]);
+                        let tenNhom = reformatString(row["#tenNhom"]);
+                        let tuanThiEnd = row["#tuanThi"];
+                        let tuanThiMid = "T" + date_helper.weeksFromTo(date_helper.dashToDate(startDayYear), date_helper.dotToDate(row["#ngayThi"]));
 
-                            let findResult = await dbFindMany(term, [maLop]);
-                            let existClasses = findResult.body;
+                        let lopHocNew = {
+                            maLop: maLop,
+                            maHocPhan: row["#maHocPhan"],
+                            tenHocPhan: row["#tenHocPhan"],
+                            ghiChu: row["#ghiChu"]
+                        };
+                        let nhomThiNew = {
+                            name: tenNhom,
+                            thuThi: row["#thuThi"],
+                            ngayThi: row["#ngayThi"],
+                            kipThi: row["#kipThi"],
+                            phongThi: row["#phongThi"],
+                            tuanThi: end ? tuanThiEnd : tuanThiMid,
+                            _timestamp: Date.now()
+                        };
 
-                            switch (existClasses.length) {
-                                case 0://EXPLAIN: not exist, so update failed
-                                    result.body.push("Error: maLop: " + maLop + " not exist");
-                                    break;
-                                case 1://EXPLAIN: success only 1 found
-                                    maLopSet.add(maLop);
-                                    let studyClass = existClasses[0];
-                                    let insertEntry =
-                                        end ? { ...studyClass, thiCuoiKi: [nhomThiNew] } : { ...studyClass, thiGiuaKi: [nhomThiNew] };
+                        let existClasses = [];
+                        await collection.find({ maLop: maLop }).forEach(e => {
+                            existClasses.push(e);
+                        });
 
-                                    let insertResult = await dbInsertOne(term, insertEntry);
-                                    if (!insertResult.success) {
-                                        result.body.push(insertResult);
-                                    }
-                                    break;
-                                default://EXPLAIN: insert success has >= 2 buoiHoc
-                                    result.body.push("Error: maLop: " + maLop + " duplicate");
-                                    break;
-                            }
-                            resolve();
+                        switch (existClasses.length) {
+                            case 0://EXPLAIN: not exist, so update failed
+                                result.body.push("Error: maLop: " + maLop + " not exist");
+                                break;
+                            case 1://EXPLAIN: success only 1 found
+                                maLopSet.add(maLop);
+                                let studyClass = existClasses[0];
+                                let insertEntry = end ? { ...studyClass, thiCuoiKi: [nhomThiNew] } : { ...studyClass, thiGiuaKi: [nhomThiNew] };
 
-                        } catch (e) {
-                            reject("MaLop: " + maLop + ", " + e);
+                                delete insertEntry._id;
+                                let insertResult = await collection.insertOne(insertEntry);
+                                if (insertResult.insertedCount == 0) {
+                                    result.body.push(insertResult);
+                                }
+                                break;
+                            default://EXPLAIN: insert success has >= 2 buoiHoc
+                                result.body.push("Error: maLop: " + maLop + " duplicate");
+                                break;
                         }
-                    }).catch(log_helper.error));
-                }, resolve);
+                        resolve();
 
-            } catch (e) {
-                reject(e);
-            }
+                    } catch (e) {
+                        reject("MaLop: " + row["#maLop"] + ", " + e);
+                    }
+                }).catch(log_helper.error));
+            }, resolve);
         }).catch(log_helper.error);
 
         await Promise.all(promises);
@@ -817,9 +879,10 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
         let count = 0;
         maLopSet.forEach((maLop) => {
             promises.push(new Promise(async (resolve, reject) => {
-                let findResult = await dbFindMany(term, [maLop]);
-                let existClasses = findResult.body;
-                // console.log(maLop + " " + existClasses.length + " " + JSON.stringify(existClasses[0]));
+                let existClasses = [];
+                await collection.find({ maLop: maLop }).forEach(e => {
+                    existClasses.push(e);
+                });
 
                 switch (existClasses.length) {
                     case 0://EXPLAIN: not exist, so insert failed
@@ -830,8 +893,8 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
                         break;
                     default://EXPLAIN: insert success has >= 2 buoiHoc
                         count++;
-                        let deletedResult = await dbDeleteMany(term, maLop);
-                        if (!deletedResult.success) {
+                        let deletedResult = await collection.deleteMany({ maLop: maLop });
+                        if (deletedResult.deletedCount == 0) {
                             result.body.push("Error: maLop: " + maLop + " delete to combine failed");
                             break;
                         }
@@ -853,8 +916,10 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
                             }
                             return total;
                         }, existClasses[0]);
-                        let reinsertResult = await dbInsertOne(term, lopHocMain);
-                        if (!reinsertResult.success) {
+
+                        delete lopHocMain._id;
+                        let reinsertResult = await collection.insertOne(lopHocMain);
+                        if (reinsertResult.insertedCount == 0) {
                             result.body.push("Error: maLop: " + maLop + " insert after combine failed");
                             break;
                         }
@@ -873,13 +938,16 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
         result.success = false;
         result.body = e;
     }
+    releaseDatabase();
     return result;
 }
+
 
 async function main() {
     loadConfig().then(() => {
         connectDatabase().then(() => {
             initServer().catch(log_helper.error);
+            process.on("exit", disconnectDatabase);
         }).catch(log_helper.error);
     }).catch(log_helper.error);
 }

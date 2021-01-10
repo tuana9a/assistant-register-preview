@@ -3,13 +3,18 @@
         "port": "1426"
     },
     "database": {
-        "address": "127.0.0.1",
+        "address": "singapore-cluster-v0.m4ik8.mongodb.net",
         "port": "27017",
-        "username": "tuana9a",
-        "password": "Tuantai123",
+        "username": "admin",
+        "password": "3rWUWtsb1NvueNUc",
         "authSource": "register-preview"
     },
-    "path" : {
-        "uploadFolder": "D:/GemDino/WEB-RESOURCE/register-preview/csv-register-class"
+    "coreService": {
+        "address": "127.0.0.1",
+        "port": "80",
+        "resource": "/api/public/Resource"
+    },
+    "path": {
+        "resourceFolder": "./resource"
     }
 }
