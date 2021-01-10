@@ -21,7 +21,6 @@ const INFO = {
     },
     coreService: {
         address: "",
-        port: "",
         resource: "",
     },
     path: {
@@ -672,7 +671,7 @@ async function dbUpsertRegisterClass(term, csvName) {
         let collection = databaseClient.collection(`${term}-register-class`);
 
         let coreService = INFO.coreService;
-        let url = `http://${coreService.address}:${coreService.port}${coreService.resource}?path=/register-preview/${csvName}`;
+        let url = `${coreService.address}${coreService.resource}?path=/register-preview/${csvName}`;
         await downloadFile(url, INFO.path.resourceFolder + "/" + csvName);
 
         await new Promise(async (resolve, reject) => {
@@ -812,7 +811,7 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
         let collection = databaseClient.collection(`${term}-register-class`);
 
         let coreService = INFO.coreService;
-        let url = `http://${coreService.address}:${coreService.port}${coreService.resource}?path=/register-preview/${csvName}`;
+        let url = `${coreService.address}${coreService.resource}?path=/register-preview/${csvName}`;
         await downloadFile(url, INFO.path.resourceFolder + "/" + csvName);
 
         await new Promise(async (resolve, reject) => {

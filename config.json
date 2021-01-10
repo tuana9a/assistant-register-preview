@@ -10,8 +10,7 @@
         "authSource": "register-preview"
     },
     "coreService": {
-        "address": "127.0.0.1",
-        "port": "80",
+        "address": "https://hust-assistant.herokuapp.com",
         "resource": "/api/public/Resource"
     },
     "path": {
