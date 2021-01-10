@@ -1,5 +1,5 @@
 # custom
-resource/*
+resource/*.csv
 
 # Logs
 logs/*
