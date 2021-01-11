@@ -3,14 +3,14 @@
         "port": "1426"
     },
     "database": {
-        "address": "singapore-cluster-v0.m4ik8.mongodb.net",
+        "address": "127.0.0.1",
         "port": "27017",
-        "username": "admin",
-        "password": "3rWUWtsb1NvueNUc",
+        "username": "tuana9a",
+        "password": "Tuantai123",
         "authSource": "register-preview"
     },
     "coreService": {
-        "address": "https://hust-assistant.herokuapp.com",
+        "address": "http://127.0.0.1",
         "resource": "/api/public/Resource"
     },
     "ROOT_KEY": "AIzaSyCnZapIqx3X-F0Yq8iQf3XfaleXNwNZB3g"

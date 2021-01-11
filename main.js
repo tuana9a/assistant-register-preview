@@ -23,14 +23,14 @@ const INFO = {
         address: "",
         resource: "",
     },
-    path: {
-        resourceFolder: "/resource"
-    }
+    ROOT_KEY: "",
+    CURRENT_KEY: "",
 }
 
 let mongoClient;
 let databaseClient;
 let databaseIntense = false;
+
 
 function lockDatabase() {
     databaseIntense = true;
@@ -42,26 +42,20 @@ function releaseDatabase() {
 
 //SECTION: I/O
 async function loadConfig() {
-    return new Promise((resolve, reject) => {
-        fs.readFile("config.json", "utf-8", (error, data) => {
-            if (error) {
-                reject(error);
-                return;
-            }
-            try {
+    return Promise.all([
+        new Promise((resolve, reject) => {
+            let whichConfig = process.argv[2] == "--local" ? "config-local.json" : "config.json";
+            console.log("load config: " + whichConfig);
+            fs.readFile(whichConfig, "utf-8", (error, data) => {
                 let config = JSON.parse(data);
-
-                INFO.path = config.path;
                 INFO.coreService = config.coreService;
                 INFO.server = config.server;
                 INFO.database = config.database;
-
+                INFO.ROOT_KEY = config.ROOT_KEY;
                 resolve();
-            } catch (e) {
-                reject(e);
-            }
-        });
-    });
+            });
+        }),
+    ]);
 }
 async function initServer() {
     const app = express();
@@ -84,114 +78,280 @@ async function initServer() {
     app.get('/api/public/count/Class', async function (req, resp) {
         let term = req.query.term;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
+
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbCountAll(term);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
         resp.end();
-
-        let result = await dbCountAll(term);
     });
-    app.get('/api/admin/duplicate/Class', async function (req, resp) {
-        let term = req.query.term;
 
+    app.post('/api/admin/duplicate/Class', async function (req, resp) {
+        let body = req.body;
+        let term = body.term;
+        let auth = body.auth;
+
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
+
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbFindDuplicate(term);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
         resp.end();
-
-        let result = await dbFindDuplicate(term);
     });
-
     app.post('/api/admin/upsert/Class', async function (req, resp) {
-        let term = req.body.term;
-        let csvName = req.body.csvName;
+        let body = req.body;
+        let term = body.term;
+        let csvName = body.csvName;
+        let auth = body.auth;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
-        resp.end();
 
-        let result = await dbUpsertRegisterClass(term, csvName);
-        // console.log("result : " + JSON.stringify(result));
-        // console.log("finish : " + new Date());
-        // console.log("======================");
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbUpsertRegisterClass(term, csvName);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
+        resp.end();
+    });
+    app.put('/api/microservice/CurrentKey', function (req, resp) {
+        let body = req.body;
+        let auth = body.auth;
+        let newKey = body.newKey;
+        if (auth == INFO.ROOT_KEY) {
+            INFO.CURRENT_KEY = newKey;
+        }
+        resp.end();
     });
 
     app.put('/api/admin/reformat/Class', async function (req, resp) {
-        let term = req.body.term;
+        let body = req.body;
+        let term = body.term;
+        let auth = body.auth;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
-        resp.end();
 
-        let result = await dbReformatAll(term);
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbReformatAll(term);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
+        resp.end();
     });
     app.put('/api/admin/upsert/MidExam', async function (req, resp) {
-        let term = req.body.term;
-        let startDayYear = req.body.startDayYear;
-        let csvName = req.body.csvName;
+        let body = req.body;
+        let term = body.term;
+        let startDayYear = body.startDayYear;
+        let csvName = body.csvName;
+        let auth = body.auth;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
-        resp.end();
 
-        let result = await dbUpsertExamSchedule(term, startDayYear, false, csvName);
-        // console.log("result : " + JSON.stringify(result));
-        // console.log("finish : " + new Date());
-        // console.log("======================");
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbUpsertExamSchedule(term, startDayYear, false, csvName);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
+        resp.end();
     });
     app.put('/api/admin/upsert/EndExam', async function (req, resp) {
-        let term = req.body.term;
-        let startDayYear = req.body.startDayYear;
-        let csvName = req.body.csvName;
+        let body = req.body;
+        let term = body.term;
+        let startDayYear = body.startDayYear;
+        let csvName = body.csvName;
+        let auth = body.auth;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
-        resp.end();
 
-        let result = await dbUpsertExamSchedule(term, startDayYear, true, csvName);
-        // console.log("result : " + JSON.stringify(result));
-        // console.log("finish : " + new Date());
-        // console.log("======================");
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbUpsertExamSchedule(term, startDayYear, true, csvName);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
+        resp.end();
     });
 
-    app.delete('/api/admin/clear/Class', async function (req, resp) {
-        let term = req.query.term;
+    app.put('/api/admin/clear/Class', async function (req, resp) {
+        let body = req.body;
+        let term = body.term;
+        let auth = body.auth;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
-        resp.end();
 
-        let result = await dbClearAll(term);
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbClearAll(term);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
+        resp.end();
     });
-    app.delete('/api/admin/clear/MidExam', async function (req, resp) {
-        let term = req.query.term;
+    app.put('/api/admin/clear/MidExam', async function (req, resp) {
+        let body = req.body;
+        let term = body.term;
+        let auth = body.auth;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
-        resp.end();
 
-        let result = await dbClearExamSchedule(term, false);
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbClearExamSchedule(term, false);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
+        resp.end();
     });
-    app.delete('/api/admin/clear/EndExam', async function (req, resp) {
-        let term = req.query.term;
+    app.put('/api/admin/clear/EndExam', async function (req, resp) {
+        let body = req.body;
+        let term = body.term;
+        let auth = body.auth;
 
+        let response = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        resp.write(JSON.stringify({ success: true }));
-        resp.end();
 
-        let result = await dbClearExamSchedule(term, true);
+        if (databaseIntense) {
+            response.success = false;
+            response.body = "database intense";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        if (auth != INFO.CURRENT_KEY) {
+            response.success = false;
+            response.body = "For Biden";
+            resp.write(JSON.stringify(response));
+            resp.end();
+            return;
+        }
+
+        dbClearExamSchedule(term, true);
+        response.body = "executing...";
+        resp.write(JSON.stringify(response));
+        resp.end();
     });
 
 
     return new Promise((resolve, reject) => {
-        try {
-            const server = app.listen(process.env.PORT || INFO.server.port, function () {
-                let port = server.address().port;
-                console.log("server start at http://%s:%s", "127.0.0.1", port);
-                resolve();
-            });
-            server.on("error", reject);
-        } catch (e) {
-            reject(e);
-        }
+        const server = app.listen(process.env.PORT || INFO.server.port, function () {
+            let port = server.address().port;
+            console.log("server start at http://%s:%s", "127.0.0.1", port);
+            resolve();
+        });
+        server.on("error", reject);
     });
 }
 async function connectDatabase() {
@@ -203,13 +363,13 @@ async function connectDatabase() {
         let port = INFO.database.port;
         let authSource = INFO.database.authSource;
 
-        //EXPLAIN: local
-        // let conectionString = `mongodb://${username}:${password}@${address}:${port}/?authSource=${authSource}&poolSize=8`;
-        // mongoClient = new MongoClient(conectionString, { useUnifiedTopology: true });
-
-        //EXPLAIN: remote
-        let conectionString = `mongodb+srv://${username}:${password}@${address}/register-preview?retryWrites=true&w=majority`;
-        mongoClient = new MongoClient(conectionString, { useNewUrlParser: true, useUnifiedTopology: true });
+        let url = "";
+        if (process.argv[2] == "--local") {
+            url = `mongodb://${username}:${password}@${address}:${port}/?authSource=${authSource}&poolSize=8`;
+        } else {
+            url = `mongodb+srv://${username}:${password}@${address}/register-preview?retryWrites=true&w=majority`;
+        }
+        mongoClient = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
 
         try {
             await mongoClient.connect();// Connect the client to the server
@@ -336,11 +496,6 @@ async function dbCountAll(term = "") {
         result.body = "Error: Parameter: term: " + term;
         return result;
     }
-    if (databaseIntense) {
-        result.success = false;
-        result.body = -1;
-        return result;
-    }
     try {
         let count = await databaseClient.collection(`${term}-register-class`).countDocuments();
         result.body = count;
@@ -363,11 +518,6 @@ async function dbReformatAll(term = "") {
     if (term == undefined || term == "" || term.search(/^\d+.+$/) == -1) {
         result.success = false;
         result.body = "Error: Parameter: term: " + term;
-        return result;
-    }
-    if (databaseIntense) {
-        result.success = false;
-        result.body = "NOPE: database intense";
         return result;
     }
     lockDatabase();
@@ -420,11 +570,6 @@ async function dbFindDuplicate(term = "") {
         result.body = "Error: Parameter: term: " + term;
         return result;
     }
-    if (databaseIntense) {
-        result.success = false;
-        result.body = "NOPE: database intense";
-        return result;
-    }
     lockDatabase();
     try {
         let collection = databaseClient.collection(`${term}-register-class`);
@@ -468,11 +613,6 @@ async function dbClearExamSchedule(term = "", end = true) {
     if (term == undefined || term == "" || term.search(/^\d+.+$/) == -1) {
         result.success = false;
         result.body = "Error: Parameter: term: " + term;
-        return result;
-    }
-    if (databaseIntense) {
-        result.success = false;
-        result.body = "NOPE: database intense";
         return result;
     }
     lockDatabase();
@@ -520,11 +660,6 @@ async function dbClearAll(term = "") {
     if (term == undefined || term == "" || term.search(/^\d+.+$/) == -1) {
         result.success = false;
         result.body = "Error: Parameter: term: " + term;
-        return result;
-    }
-    if (databaseIntense) {
-        result.success = false;
-        result.body = "NOPE: database intense";
         return result;
     }
     lockDatabase();
@@ -659,11 +794,6 @@ async function dbUpsertRegisterClass(term, csvName) {
         result.body = "Error: Parameter: csvName: " + csvName;
         return result;
     }
-    if (databaseIntense) {
-        result.success = false;
-        result.body = "NOPE: database intense";
-        return result;
-    }
     lockDatabase();
     try {
         let promises = [];
@@ -672,10 +802,10 @@ async function dbUpsertRegisterClass(term, csvName) {
 
         let coreService = INFO.coreService;
         let url = `${coreService.address}${coreService.resource}?path=/register-preview/${csvName}`;
-        await downloadFile(url, INFO.path.resourceFolder + "/" + csvName);
+        await downloadFile(url, "./resource/" + csvName);
 
         await new Promise(async (resolve, reject) => {
-            csv_helper.readAsync(INFO.path.resourceFolder + "/" + csvName, (row) => {
+            csv_helper.readAsync("./resource/" + csvName, (row) => {
                 promises.push(new Promise(async (resolve, reject) => {
                     try {
                         let maLop = reformatString(row["#maLop"]);
@@ -799,11 +929,6 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
         result.body = "Error: Parameter: csvName: " + csvName;
         return result;
     }
-    if (databaseIntense) {
-        result.success = false;
-        result.body = "NOPE: database intense";
-        return result;
-    }
     lockDatabase();
     try {
         let promises = [];
@@ -812,10 +937,10 @@ async function dbUpsertExamSchedule(term, startDayYear, end = false, csvName) {
 
         let coreService = INFO.coreService;
         let url = `${coreService.address}${coreService.resource}?path=/register-preview/${csvName}`;
-        await downloadFile(url, INFO.path.resourceFolder + "/" + csvName);
+        await downloadFile(url, "./resource/" + csvName);
 
         await new Promise(async (resolve, reject) => {
-            csv_helper.readAsync(INFO.path.resourceFolder + "/" + csvName, (row) => {
+            csv_helper.readAsync("./resource/" + csvName, (row) => {
                 promises.push(new Promise(async (resolve, reject) => {
                     try {
                         let maLop = reformatString(row["#maLop"]);
