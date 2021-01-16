@@ -4,14 +4,9 @@
     },
     "database": {
         "address": "singapore-cluster-v0.m4ik8.mongodb.net",
-        "port": "27017",
         "username": "admin",
         "password": "3rWUWtsb1NvueNUc",
         "authSource": "register-preview"
-    },
-    "coreService": {
-        "address": "https://hust-assistant.herokuapp.com",
-        "resource": "/api/public/Resource"
     },
     "ROOT_KEY": "AIzaSyCnZapIqx3X-F0Yq8iQf3XfaleXNwNZB3g"
 }
