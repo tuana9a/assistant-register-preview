@@ -1,9 +1,10 @@
 
 const fs = require("fs");
 const express = require("express");
-const file_upload = require("express-fileupload");
+const multer = require("multer");
 const axios = require("axios").default;
 const { MongoClient } = require("mongodb");
+const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 
 const log_helper = require("./common/log-helper");
 const csv_helper = require("./common/csv-helper");
@@ -78,18 +79,18 @@ function validateStringParam(paramName = "", input = "", regex, result) {
 function validateTermParam(term = "", result) {
     return validateStringParam("term", term, /^\d+.+$/, result);
 }
-function validateCurrentkey(auth = "", response) {
+function validateCurrentkey(auth = "", result) {
     if (auth != INFO.CURRENT_KEY) {
-        response.success = false;
-        response.body = "For Biden";
+        result.success = false;
+        result.body = "unauthorized";
         return false;
     }
     return true;
 }
-function validateDatabaseIntense(response) {
+function validateDatabaseIntense(result) {
     if (databaseIntense) {
-        response.success = false;
-        response.body = "database intense";
+        result.success = false;
+        result.body = "database intense";
         return true;
     }
     return false;
@@ -147,256 +148,240 @@ async function loadConfig() {
 async function initServer() {
     const app = express();
     app.use(express.json());
-    app.use(file_upload({
-        limits: { fileSize: 10 * 1024 * 1024 },
-        safeFileNames: true,
-    }));
 
     app.get('/', function (req, resp) {
+        resp.setHeader("Content-Type", "text/plain");
+        resp.write("online");
         resp.end();
     });
 
-    app.get('/api/public/find/Class', async function (req, resp) {
-        let classIds = req.query.ids.trim().replace(/",\s*,/, ",").split(/\s*,\s*|\s+/);
+
+    app.get('/api/public/classes', async function (req, resp) {
+        let ids = String(req.query.ids).trim().replace(/",\s*,/, ",").split(/\s*,\s*|\s+/);
         let term = req.query.term;
 
-        let response = { success: true, body: [] };
+        let result = { success: true, body: [] };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
         if (databaseIntense) {
-            response.success = false;
-            resp.write(JSON.stringify(response));
+            result.success = false;
+            resp.write(JSON.stringify(result));
             resp.end();
             return;
         }
 
-        response = await dbFindMany(term, classIds);
-        resp.write(JSON.stringify(response));
+        result = await dbFindMany(term, ids);
+        resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.get('/api/public/guess/Class', async function (req, resp) {
-        let classId = req.query.id;
+    app.get('/api/public/guess-class', async function (req, resp) {
+        let id = req.query.id;
         let term = req.query.term;
 
-        let response = { success: true, body: [] };
+        let result = { success: true, body: [] };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
         if (databaseIntense) {
-            response.success = false;
-            resp.write(JSON.stringify(response));
+            result.success = false;
+            resp.write(JSON.stringify(result));
             resp.end();
             return;
         }
 
-        response = await dbGuessClass(term, classId);
-        resp.write(JSON.stringify(response));
+        result = await dbGuessClass(term, id);
+        resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.get('/api/public/count/Class', async function (req, resp) {
+
+
+    app.post('/api/admin/classes', upload.single('file'), async function (req, resp) {
         let term = req.query.term;
+        let auth = req.headers["auth"];
 
-        let response = { success: true, body: {} };
+        let result = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
-        if (validateDatabaseIntense(response)) {
-            resp.write(JSON.stringify(response));
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
             resp.end();
             return;
         }
 
-        dbCountAll(term);
-        response.body = "executing...";
-        resp.write(JSON.stringify(response));
-        resp.end();
-    });
-    app.post('/api/admin/duplicate/Class', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let auth = body.auth;
-
-        let response = { success: true, body: {} };
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
-            resp.end();
-            return;
-        }
-
-        dbFindDuplicate(term);
-        response.body = "executing...";
-        resp.write(JSON.stringify(response));
-        resp.end();
-    });
-
-
-    app.put('/api/microservice/CurrentKey', function (req, resp) {
-        let body = req.body;
-        let auth = body.auth;
-        let newKey = body.newKey;
-        if (auth == INFO.ROOT_KEY) {
-            INFO.CURRENT_KEY = newKey;
-        }
-        resp.end();
-    });
-
-
-    app.post('/api/admin/upsert/Class', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let csvName = body.csvName;
-        let auth = body.auth;
-
-        let response = { success: true, body: {} };
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
-            resp.end();
-            return;
-        }
-
-        let csvFile = req.files.file;
-        if (csvFile) {
-            response.body = "executing...";
-            await csvFile.mv("./resource/" + csvName);
-            dbUpsertRegisterClass(term, csvName);
+        let file = req.file;
+        if (file) {
+            let filename = file.originalname;
+            result.body = "executing...";
+            fs.writeFileSync("./resource/" + filename, file.buffer, { flag: "w" });
+            dbUpsertRegisterClass(term, filename);
         } else {
-            response.body = "no file !";
+            result.body = "no file !";
         }
-        resp.write(JSON.stringify(response));
+        resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.post('/api/admin/upsert/MidExam', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let startDayYear = body.startDayYear;
-        let csvName = body.csvName;
-        let auth = body.auth;
+    app.delete('/api/admin/classes', async function (req, resp) {
 
-        let response = { success: true, body: {} };
+        let term = req.query.term;
+        let auth = req.headers["auth"];
+
+        let result = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
-            resp.end();
-            return;
-        }
-
-        let csvFile = req.files.file;
-        if (csvFile) {
-            response.body = "executing...";
-            await csvFile.mv("./resource/" + csvName);
-            dbUpsertMidExam(term, startDayYear, csvName);
-        } else {
-            response.body = "no file !";
-        }
-        resp.write(JSON.stringify(response));
-        resp.end();
-    });
-    app.post('/api/admin/upsert/EndExam', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let startDayYear = body.startDayYear;
-        let csvName = body.csvName;
-        let auth = body.auth;
-
-        let response = { success: true, body: {} };
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
-            resp.end();
-            return;
-        }
-
-        let csvFile = req.files.file;
-        if (csvFile) {
-            response.body = "executing...";
-            await csvFile.mv("./resource/" + csvName);
-            dbUpsertEndExam(term, startDayYear, csvName);
-        } else {
-            response.body = "no file !";
-        }
-        resp.write(JSON.stringify(response));
-        resp.end();
-    });
-
-
-    app.put('/api/admin/reformat/Class', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let auth = body.auth;
-
-        let response = { success: true, body: {} };
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
-            resp.end();
-            return;
-        }
-
-        dbReformatAll(term);
-        response.body = "executing...";
-        resp.write(JSON.stringify(response));
-        resp.end();
-    });
-    app.put('/api/admin/clear/Class', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let auth = body.auth;
-
-        let response = { success: true, body: {} };
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
             resp.end();
             return;
         }
 
         dbClearRegisterClass(term);
-        response.body = "executing...";
-        resp.write(JSON.stringify(response));
+        result.body = "executing...";
+        resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.put('/api/admin/clear/MidExam', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let auth = body.auth;
 
-        let response = { success: true, body: {} };
+
+    app.post('/api/admin/classes/mid-exam', upload.single('file'), async function (req, resp) {
+        let term = req.query.term;
+        let firstWeekDay = req.query.firstWeekDay;
+        let auth = req.headers["auth"];
+
+        let result = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
+            resp.end();
+            return;
+        }
+
+        let file = req.file;
+        if (file) {
+            let filename = file.originalname;
+            result.body = "executing...";
+            fs.writeFileSync("./resource/" + filename, file.buffer, { flag: "w" });
+            dbUpsertMidExam(term, firstWeekDay, filename);
+        } else {
+            result.body = "no file !";
+        }
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+    app.post('/api/admin/classes/end-exam', upload.single('file'), async function (req, resp) {
+        let term = req.query.term;
+        let firstWeekDay = req.query.firstWeekDay;
+        let auth = req.headers["auth"];
+
+        let result = { success: true, body: {} };
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
+            resp.end();
+            return;
+        }
+
+        let file = req.file;
+        if (file) {
+            let filename = file.originalname;
+            result.body = "executing...";
+            fs.writeFileSync("./resource/" + filename, file.buffer, { flag: "w" });
+            dbUpsertEndExam(term, firstWeekDay, filename);
+        } else {
+            result.body = "no file !";
+        }
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+    app.delete('/api/admin/classes/mid-exam', async function (req, resp) {
+        let term = req.query.term;
+        let auth = req.headers["auth"];
+
+        let result = { success: true, body: {} };
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
             resp.end();
             return;
         }
 
         dbClearExamSchedule(term, false);
-        response.body = "executing...";
-        resp.write(JSON.stringify(response));
+        result.body = "executing...";
+        resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.put('/api/admin/clear/EndExam', async function (req, resp) {
-        let body = req.body;
-        let term = body.term;
-        let auth = body.auth;
+    app.delete('/api/admin/classes/end-exam', async function (req, resp) {
+        let term = req.query.term;
+        let auth = req.headers["auth"];
 
-        let response = { success: true, body: {} };
+        let result = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
-        if (validateDatabaseIntense(response) || !validateCurrentkey(auth, response)) {
-            resp.write(JSON.stringify(response));
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
             resp.end();
             return;
         }
 
         dbClearExamSchedule(term, true);
-        response.body = "executing...";
-        resp.write(JSON.stringify(response));
+        result.body = "executing...";
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+
+
+    app.put('/api/micro/current-key', function (req, resp) {
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+        let body = req.body;
+        let auth = req.headers["auth"];
+        let result = { success: true, body: {} };
+
+        let key = body.key;
+        if (auth == INFO.ROOT_KEY) {
+            INFO.CURRENT_KEY = key;
+            result.body = "update success";
+        } else {
+            result.success = false;
+        }
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+
+
+    app.get('/api/utils/duplicate-classes', async function (req, resp) {
+        let term = req.query.term;
+        let auth = req.headers["auth"];
+
+        let result = { success: true, body: {} };
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
+            resp.end();
+            return;
+        }
+
+        dbFindDuplicate(term);
+        result.body = "executing...";
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
+    app.get('/api/utils/reformat-classes', async function (req, resp) {
+        let term = req.query.term;
+        let auth = req.headers["auth"];
+
+        let result = { success: true, body: {} };
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
+            resp.end();
+            return;
+        }
+
+        dbReformatAll(term);
+        result.body = "executing...";
+        resp.write(JSON.stringify(result));
         resp.end();
     });
 
@@ -474,22 +459,6 @@ async function dbGuessClass(term = "", classId = "") {
         let query = { maLop: { $regex: regex } };
         let cursor = databaseClient.collection(`${term}-register-class`).find(query);
         await cursor.forEach(e => result.body.push(e));
-
-    } catch (e) {
-        log_helper.error(e);
-        result.success = false;
-        result.body = e;
-    }
-
-    return result;
-}
-async function dbCountAll(term = "") {
-    let result = { success: true, body: -1 };
-    if (!validateTermParam(term, result)) return result;
-
-    try {
-        let count = await databaseClient.collection(`${term}-register-class`).countDocuments();
-        result.body = count;
 
     } catch (e) {
         log_helper.error(e);
@@ -764,7 +733,7 @@ async function dbUpsertRegisterClass(term, csvName) {
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
     return result;
 }
-async function dbUpsertMidExam(term, startDayYear, csvName) {
+async function dbUpsertMidExam(term, firstWeekDay, csvName) {
     let result = { success: true, body: [] };
     if (!validateTermParam(term, result)) return result;
     if (!validateStringParam("csvName", csvName, /^\d+.+-mid-exam.csv$/, result)) return result;
@@ -778,7 +747,7 @@ async function dbUpsertMidExam(term, startDayYear, csvName) {
         async function insertClassFromRow(row) {
             return new Promise(async (resolve, reject) => {
                 let maLop = reformatString(row["#maLop"]);
-                let tuanThi = "T" + date_helper.weeksFromTo(date_helper.dashToDate(startDayYear), date_helper.dotToDate(row["#ngayThi"]));
+                let tuanThi = "T" + date_helper.weeksFromTo(date_helper.dashToDate(firstWeekDay), date_helper.dotToDate(row["#ngayThi"]));
 
                 let nhomThiNew = {
                     name: reformatString(row["#tenNhom"]),
@@ -897,7 +866,7 @@ async function dbUpsertMidExam(term, startDayYear, csvName) {
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
     return result;
 }
-async function dbUpsertEndExam(term, startDayYear, csvName) {
+async function dbUpsertEndExam(term, firstWeekDay, csvName) {
     let result = { success: true, body: [] };
     if (!validateTermParam(term, result)) return result;
     if (!validateStringParam("csvName", csvName, /^\d+.+-end-exam.csv$/, result)) return result;
