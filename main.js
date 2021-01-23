@@ -97,6 +97,13 @@ function validateDatabaseIntense(result) {
 }
 
 
+//SECTION: helper
+function processQueryClassIds(classIds = "") {
+    return classIds.trim()
+        .split(/\s*,\s*|\s+/)
+        .map(e => e.replace(/[\D]+/g, ""))
+        .filter(e => e != "");
+}
 function reformatClassProperty(studyClass) {
     reformatStringPropety(studyClass);
     for (let buoiHoc of studyClass.cacBuoiHoc) {
@@ -157,7 +164,7 @@ async function initServer() {
 
 
     app.get('/api/public/classes', async function (req, resp) {
-        let ids = String(req.query.ids).trim().replace(/",\s*,/, ",").split(/\s*,\s*|\s+/);
+        let ids = processQueryClassIds(String(req.query.ids));
         let term = req.query.term;
 
         let result = { success: true, body: [] };

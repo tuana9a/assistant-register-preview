@@ -1,5 +1,6 @@
 # custom
 resource/*.csv
+*test*
 
 # Logs
 logs/*.log
