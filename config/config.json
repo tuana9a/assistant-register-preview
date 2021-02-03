@@ -8,5 +8,7 @@
         "password": "3rWUWtsb1NvueNUc",
         "authSource": "register-preview"
     },
-    "ROOT_KEY": "AIzaSyCnZapIqx3X-F0Yq8iQf3XfaleXNwNZB3g"
+    "masterService": {
+        "address": "https://assistant-master-service.herokuapp.com"
+    }
 }

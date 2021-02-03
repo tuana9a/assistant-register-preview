@@ -1,8 +1,8 @@
 
 const fs = require("fs");
-const express = require("express");
 const multer = require("multer");
 const axios = require("axios").default;
+const express = require("express");
 const { MongoClient } = require("mongodb");
 const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -10,7 +10,8 @@ const log_helper = require("./common/log-helper");
 const csv_helper = require("./common/csv-helper");
 const date_helper = require("./common/date-helper");
 
-const INFO = {
+var CONFIG = {
+    isLocal: false,
     server: {
         port: -1
     },
@@ -20,6 +21,11 @@ const INFO = {
         password: "",
         authSource: "",
     },
+    masterService: {
+        address: ""
+    },
+}
+var SECURITY = {
     ROOT_KEY: "",
     CURRENT_KEY: "",
 }
@@ -34,36 +40,6 @@ function lockDatabase() {
 }
 function releaseDatabase() {
     databaseIntense = false;
-}
-async function downloadFile(url = "", outputPath = "") {
-    const writer = fs.createWriteStream(outputPath);
-
-    return axios({
-        method: 'get',
-        url: url,
-        responseType: 'stream',
-    }).then(response => {
-
-        //ensure that the user can call `then()` only when the file has
-        //been downloaded entirely.
-
-        return new Promise((resolve, reject) => {
-            response.data.pipe(writer);
-            let error = null;
-            writer.on('error', err => {
-                error = err;
-                writer.close();
-                reject(err);
-            });
-            writer.on('close', () => {
-                if (!error) {
-                    resolve(true);
-                }
-                //no need to call the reject here, as it will have been called in the
-                //'error' stream;
-            });
-        });
-    });
 }
 
 
@@ -80,7 +56,7 @@ function validateTermParam(term = "", result) {
     return validateStringParam("term", term, /^\d+.+$/, result);
 }
 function validateCurrentkey(auth = "", result) {
-    if (auth != INFO.CURRENT_KEY) {
+    if (auth != SECURITY.CURRENT_KEY) {
         result.success = false;
         result.body = "unauthorized";
         return false;
@@ -138,15 +114,28 @@ function reformatString(input = "") {
 //SECTION: I/O
 async function loadConfig() {
     console.log(String(fs.readFileSync("favicon.txt")));
+
     return Promise.all([
         new Promise((resolve, reject) => {
-            let whichConfig = process.argv[2] == "--local" ? "config-local.json" : "config.json";
-            console.log("load config: " + whichConfig);
-            fs.readFile(whichConfig, "utf-8", (error, data) => {
-                let config = JSON.parse(data);
-                INFO.server = config.server;
-                INFO.database = config.database;
-                INFO.ROOT_KEY = config.ROOT_KEY;
+            fs.readFile("./config/config-local.json", "utf-8", (e, data) => {
+                if (e) {
+                    fs.readFile("./config/config.json", "utf-8", (e, data) => {
+                        console.log("load config.json");
+                        CONFIG = JSON.parse(data);
+                        CONFIG.isLocal = false;
+                        resolve();
+                    });
+                    return;
+                }
+                console.log("load config-local.json");
+                CONFIG = JSON.parse(data);
+                CONFIG.isLocal = true;
+                resolve();
+            });
+        }),
+        new Promise((resolve, reject) => {
+            fs.readFile("./config/security.json", "utf-8", (e, data) => {
+                SECURITY = JSON.parse(data);
                 resolve();
             });
         }),
@@ -181,8 +170,8 @@ async function initServer() {
         resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.get('/api/public/guess-class', async function (req, resp) {
-        let id = req.query.id;
+    app.get('/api/public/guess-classes', async function (req, resp) {
+        let ids = processQueryClassIds(String(req.query.ids));
         let term = req.query.term;
 
         let result = { success: true, body: [] };
@@ -195,7 +184,7 @@ async function initServer() {
             return;
         }
 
-        result = await dbGuessClass(term, id);
+        result = await dbGuessClasses(term, ids);
         resp.write(JSON.stringify(result));
         resp.end();
     });
@@ -226,27 +215,6 @@ async function initServer() {
         resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.delete('/api/admin/classes', async function (req, resp) {
-
-        let term = req.query.term;
-        let auth = req.headers["auth"];
-
-        let result = { success: true, body: {} };
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-
-        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
-            resp.write(JSON.stringify(result));
-            resp.end();
-            return;
-        }
-
-        dbClearRegisterClass(term);
-        result.body = "executing...";
-        resp.write(JSON.stringify(result));
-        resp.end();
-    });
-
-
     app.post('/api/admin/classes/mid-exam', upload.single('file'), async function (req, resp) {
         let term = req.query.term;
         let firstWeekDay = req.query.firstWeekDay;
@@ -299,6 +267,26 @@ async function initServer() {
         resp.write(JSON.stringify(result));
         resp.end();
     });
+
+
+    app.delete('/api/admin/classes', async function (req, resp) {
+        let term = req.query.term;
+        let auth = req.headers["auth"];
+
+        let result = { success: true, body: {} };
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+
+        if (validateDatabaseIntense(result) || !validateCurrentkey(auth, result)) {
+            resp.write(JSON.stringify(result));
+            resp.end();
+            return;
+        }
+
+        dbClearRegisterClass(term);
+        result.body = "executing...";
+        resp.write(JSON.stringify(result));
+        resp.end();
+    });
     app.delete('/api/admin/classes/mid-exam', async function (req, resp) {
         let term = req.query.term;
         let auth = req.headers["auth"];
@@ -338,14 +326,14 @@ async function initServer() {
 
 
     app.put('/api/micro/current-key', function (req, resp) {
-        resp.setHeader("Content-Type", "application/json; charset=utf-8");
-        let body = req.body;
         let auth = req.headers["auth"];
-        let result = { success: true, body: {} };
+        let key = req.body.key;
 
-        let key = body.key;
-        if (auth == INFO.ROOT_KEY) {
-            INFO.CURRENT_KEY = key;
+        let result = { success: true, body: {} };
+        resp.setHeader("Content-Type", "application/json; charset=utf-8");
+
+        if (auth == SECURITY.ROOT_KEY) {
+            SECURITY.CURRENT_KEY = key;
             result.body = "update success";
         } else {
             result.success = false;
@@ -355,7 +343,7 @@ async function initServer() {
     });
 
 
-    app.get('/api/utils/duplicate-classes', async function (req, resp) {
+    app.get('/api/admin/utils/duplicate-classes', async function (req, resp) {
         let term = req.query.term;
         let auth = req.headers["auth"];
 
@@ -373,7 +361,7 @@ async function initServer() {
         resp.write(JSON.stringify(result));
         resp.end();
     });
-    app.get('/api/utils/reformat-classes', async function (req, resp) {
+    app.get('/api/admin/utils/reformat-classes', async function (req, resp) {
         let term = req.query.term;
         let auth = req.headers["auth"];
 
@@ -394,7 +382,7 @@ async function initServer() {
 
 
     return new Promise((resolve, reject) => {
-        const server = app.listen(process.env.PORT || INFO.server.port, function () {
+        const server = app.listen(process.env.PORT || CONFIG.server.port, function () {
             let port = server.address().port;
             console.log("server start at http://%s:%s", "127.0.0.1", port);
             resolve();
@@ -405,16 +393,16 @@ async function initServer() {
 async function connectDatabase() {
     return new Promise(async (resolve, reject) => {
 
-        let username = encodeURIComponent(INFO.database.username);
-        let password = encodeURIComponent(INFO.database.password);
-        let address = INFO.database.address;
-        let authSource = INFO.database.authSource;
+        let username = encodeURIComponent(CONFIG.database.username);
+        let password = encodeURIComponent(CONFIG.database.password);
+        let address = CONFIG.database.address;
+        let authSource = CONFIG.database.authSource;
 
         let url = "";
-        if (process.argv[2] == "--local") {
+        if (CONFIG.isLocal) {
             url = `mongodb://${username}:${password}@${address}/?authSource=${authSource}&poolSize=8`;
         } else {
-            url = `mongodb+srv://${username}:${password}@${address}/register-preview?retryWrites=true&w=majority`;
+            url = `mongodb+srv://${username}:${password}@${address}?retryWrites=true&w=majority`;
         }
         mongoClient = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
 
@@ -457,13 +445,15 @@ async function dbFindMany(term = "", classIds = []) {
 
     return result;
 }
-async function dbGuessClass(term = "", classId = "") {
+async function dbGuessClasses(term = "", classIds = []) {
     let result = { success: true, body: [], };
     if (!validateTermParam(term, result)) return result;
 
     try {
-        let regex = new RegExp(`${classId}.*`);
-        let query = { maLop: { $regex: regex } };
+        let or = classIds.map(id => {
+            return { maLop: { $regex: new RegExp(`${id}.*`) } };
+        });
+        let query = { $or: or };
         let cursor = databaseClient.collection(`${term}-register-class`).find(query);
         await cursor.forEach(e => result.body.push(e));
 
@@ -477,7 +467,7 @@ async function dbGuessClass(term = "", classId = "") {
 }
 
 
-//SECTION: lock, release database
+//SECTION: database instense
 async function dbReformatAll(term = "") {
     let result = { success: true, body: -1 };
     if (!validateTermParam(term, result)) return result;
@@ -521,7 +511,11 @@ async function dbReformatAll(term = "") {
     }
     releaseDatabase();
 
-    return result;
+    let bodyReport = { micro: "register-preview", ...result };
+    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
+
+    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
 }
 async function dbFindDuplicate(term = "") {
     let result = { success: true, body: {} };
@@ -561,7 +555,11 @@ async function dbFindDuplicate(term = "") {
     }
     releaseDatabase();
 
-    return result;
+    let bodyReport = { micro: "register-preview", ...result };
+    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
+
+    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
 }
 async function dbClearExamSchedule(term = "", end = true) {
     let result = { success: true, body: [] };
@@ -576,7 +574,7 @@ async function dbClearExamSchedule(term = "", end = true) {
         await cursor.forEach((studyClass) => {
             promises.push(new Promise((resolve, reject) => {
                 let maLop = studyClass.maLop;
-                let updateQuery = { $set: end ? { thiCuoiKi: [] } : { thiGiuaKi: [] } };
+                let updateQuery = end ? { $set: { thiCuoiKi: [] } } : { $set: { thiGiuaKi: [] } };
                 collection.updateMany({ maLop: maLop }, updateQuery, (e, updateResult) => {
                     if (e) {
                         result.body.push("MaLop: " + maLop + " " + e);
@@ -598,7 +596,11 @@ async function dbClearExamSchedule(term = "", end = true) {
     }
     releaseDatabase();
 
-    return result;
+    let bodyReport = { micro: "register-preview", ...result };
+    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
+
+    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
 }
 async function dbClearRegisterClass(term = "") {
     let result = { success: true, body: {} };
@@ -617,11 +619,15 @@ async function dbClearRegisterClass(term = "") {
     }
     releaseDatabase();
 
-    return result;
+    let bodyReport = { micro: "register-preview", ...result };
+    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
+
+    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
 }
 
 
-//SECTION: lock, release database
+//SECTION: database instense
 async function dbUpsertRegisterClass(term, csvName) {
     let result = { success: true, body: [] };
     if (!validateTermParam(term, result)) return result;
@@ -738,7 +744,11 @@ async function dbUpsertRegisterClass(term, csvName) {
     releaseDatabase();
 
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
-    return result;
+    let bodyReport = { micro: "register-preview", ...result };
+    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
+
+    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
 }
 async function dbUpsertMidExam(term, firstWeekDay, csvName) {
     let result = { success: true, body: [] };
@@ -871,7 +881,11 @@ async function dbUpsertMidExam(term, firstWeekDay, csvName) {
     releaseDatabase();
 
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
-    return result;
+    let bodyReport = { micro: "register-preview", ...result };
+    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
+
+    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
 }
 async function dbUpsertEndExam(term, firstWeekDay, csvName) {
     let result = { success: true, body: [] };
@@ -1004,15 +1018,19 @@ async function dbUpsertEndExam(term, firstWeekDay, csvName) {
     releaseDatabase();
 
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
-    return result;
+    let bodyReport = { micro: "register-preview", ...result };
+    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
+
+    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
 }
 
 
+process.on("exit", disconnectDatabase);
 async function main() {
     loadConfig().then(() => {
         connectDatabase().then(() => {
             initServer().catch(log_helper.error);
-            process.on("exit", disconnectDatabase);
         }).catch(log_helper.error);
     }).catch(log_helper.error);
 }

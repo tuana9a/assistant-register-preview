@@ -1,6 +1,8 @@
 # custom
 resource/*.csv
 *test*
+config-local.json
+*.cmd
 
 # Logs
 logs/*.log
