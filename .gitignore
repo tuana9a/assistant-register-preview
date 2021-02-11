@@ -1,8 +1,10 @@
 # custom
-resource/*.csv
-*test*
-config-local.json
+config/*local.json
 *.cmd
+resource/*
+!resource/helloworld.txt
+*test*
+*.code-workspace
 
 # Logs
 logs/*.log

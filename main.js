@@ -10,39 +10,80 @@ const log_helper = require("./common/log-helper");
 const csv_helper = require("./common/csv-helper");
 const date_helper = require("./common/date-helper");
 
-var CONFIG = {
-    isLocal: false,
-    server: {
-        port: -1
+
+const CONFIG = {
+    SERVER: {
+        isLocal: false,
+        port: -1,
     },
-    database: {
+    SECURITY: {
+        isLocal: false,
+        ROOT_KEY: "",
+        CURRENT_KEY: "",
+    },
+    DATABASE: {
+        isLocal: false,
         address: "",
         username: "",
         password: "",
         authSource: "",
     },
-    masterService: {
-        address: ""
-    },
-}
-var SECURITY = {
-    ROOT_KEY: "",
-    CURRENT_KEY: "",
+    MICROSERVICE: {
+        isLocal: false,
+        viewService: {
+            address: ""
+        },
+        masterService: {
+            address: ""
+        },
+        schoolService: {
+            address: ""
+        },
+        registerPreview: {
+            address: ""
+        },
+        securityService: {
+            address: ""
+        }
+    }
 }
 
 let mongoClient;
-let databaseClient;
-let databaseIntense = false;
+let databaseRegisterClassClient;
+let databaseRegisterClassIntense = false;
 
 
-function lockDatabase() {
-    databaseIntense = true;
+//SECTION: config
+async function loadConfig(name, which) {
+    return new Promise((resolve, reject) => {
+        fs.readFile(`./config/${name}-local.json`, "utf-8", (err, data) => {
+            if (err) {
+                fs.readFile(`./config/${name}.json`, "utf-8", (err, data) => {
+                    console.log(`load ${name}.json`);
+                    CONFIG[`${which}`] = JSON.parse(data);
+                    resolve();
+                });
+                return;
+            }
+            console.log(`load ${name}-local.json`);
+            CONFIG[`${which}`] = JSON.parse(data);
+            resolve();
+        });
+    });
 }
-function releaseDatabase() {
-    databaseIntense = false;
+async function loadAllConfig() {
+    console.log(String(fs.readFileSync("favicon.txt")));
+
+    return Promise.all([
+        loadConfig("server", "SERVER"),
+        loadConfig("database", "DATABASE"),
+        loadConfig("microservice", "MICROSERVICE"),
+        loadConfig("security", "SECURITY"),
+    ]);
 }
 
 
+//SECTION: validate function
 function validateStringParam(paramName = "", input = "", regex, result) {
     if (input == undefined || input == "" || input.search(regex) == -1) {
         result.success = false;
@@ -56,7 +97,7 @@ function validateTermParam(term = "", result) {
     return validateStringParam("term", term, /^\d+.+$/, result);
 }
 function validateCurrentkey(auth = "", result) {
-    if (auth != SECURITY.CURRENT_KEY) {
+    if (auth != CONFIG.SECURITY.CURRENT_KEY) {
         result.success = false;
         result.body = "unauthorized";
         return false;
@@ -64,7 +105,7 @@ function validateCurrentkey(auth = "", result) {
     return true;
 }
 function validateDatabaseIntense(result) {
-    if (databaseIntense) {
+    if (databaseRegisterClassIntense) {
         result.success = false;
         result.body = "database intense";
         return true;
@@ -73,7 +114,7 @@ function validateDatabaseIntense(result) {
 }
 
 
-//SECTION: helper
+//SECTION: standardlize data
 function processQueryClassIds(classIds = "") {
     return classIds.trim()
         .split(/\s*,\s*|\s+/)
@@ -112,35 +153,6 @@ function reformatString(input = "") {
 
 
 //SECTION: I/O
-async function loadConfig() {
-    console.log(String(fs.readFileSync("favicon.txt")));
-
-    return Promise.all([
-        new Promise((resolve, reject) => {
-            fs.readFile("./config/config-local.json", "utf-8", (e, data) => {
-                if (e) {
-                    fs.readFile("./config/config.json", "utf-8", (e, data) => {
-                        console.log("load config.json");
-                        CONFIG = JSON.parse(data);
-                        CONFIG.isLocal = false;
-                        resolve();
-                    });
-                    return;
-                }
-                console.log("load config-local.json");
-                CONFIG = JSON.parse(data);
-                CONFIG.isLocal = true;
-                resolve();
-            });
-        }),
-        new Promise((resolve, reject) => {
-            fs.readFile("./config/security.json", "utf-8", (e, data) => {
-                SECURITY = JSON.parse(data);
-                resolve();
-            });
-        }),
-    ]);
-}
 async function initServer() {
     const app = express();
     app.use(express.json());
@@ -159,7 +171,7 @@ async function initServer() {
         let result = { success: true, body: [] };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
-        if (databaseIntense) {
+        if (databaseRegisterClassIntense) {
             result.success = false;
             resp.write(JSON.stringify(result));
             resp.end();
@@ -177,7 +189,7 @@ async function initServer() {
         let result = { success: true, body: [] };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
-        if (databaseIntense) {
+        if (databaseRegisterClassIntense) {
             result.success = false;
             resp.write(JSON.stringify(result));
             resp.end();
@@ -300,7 +312,7 @@ async function initServer() {
             return;
         }
 
-        dbClearExamSchedule(term, false);
+        dbClearMidExam(term);
         result.body = "executing...";
         resp.write(JSON.stringify(result));
         resp.end();
@@ -318,7 +330,7 @@ async function initServer() {
             return;
         }
 
-        dbClearExamSchedule(term, true);
+        dbClearEndExam(term);
         result.body = "executing...";
         resp.write(JSON.stringify(result));
         resp.end();
@@ -332,8 +344,8 @@ async function initServer() {
         let result = { success: true, body: {} };
         resp.setHeader("Content-Type", "application/json; charset=utf-8");
 
-        if (auth == SECURITY.ROOT_KEY) {
-            SECURITY.CURRENT_KEY = key;
+        if (auth == CONFIG.SECURITY.ROOT_KEY) {
+            CONFIG.SECURITY.CURRENT_KEY = key;
             result.body = "update success";
         } else {
             result.success = false;
@@ -382,7 +394,7 @@ async function initServer() {
 
 
     return new Promise((resolve, reject) => {
-        const server = app.listen(process.env.PORT || CONFIG.server.port, function () {
+        const server = app.listen(process.env.PORT || CONFIG.SERVER.port, function () {
             let port = server.address().port;
             console.log("server start at http://%s:%s", "127.0.0.1", port);
             resolve();
@@ -393,13 +405,13 @@ async function initServer() {
 async function connectDatabase() {
     return new Promise(async (resolve, reject) => {
 
-        let username = encodeURIComponent(CONFIG.database.username);
-        let password = encodeURIComponent(CONFIG.database.password);
-        let address = CONFIG.database.address;
-        let authSource = CONFIG.database.authSource;
+        let username = encodeURIComponent(CONFIG.DATABASE.username);
+        let password = encodeURIComponent(CONFIG.DATABASE.password);
+        let address = CONFIG.DATABASE.address;
+        let authSource = CONFIG.DATABASE.authSource;
 
         let url = "";
-        if (CONFIG.isLocal) {
+        if (CONFIG.DATABASE.isLocal) {
             url = `mongodb://${username}:${password}@${address}/?authSource=${authSource}&poolSize=8`;
         } else {
             url = `mongodb+srv://${username}:${password}@${address}?retryWrites=true&w=majority`;
@@ -409,7 +421,7 @@ async function connectDatabase() {
         try {
             await mongoClient.connect();// Connect the client to the server
             await mongoClient.db("admin").command({ ping: 1 });// Establish and verify connection
-            databaseClient = mongoClient.db("register-preview");
+            databaseRegisterClassClient = mongoClient.db("register-preview");
             // let result = await databaseClient.collection("").find({}); result.deletedCount;
             resolve();
 
@@ -423,16 +435,35 @@ async function disconnectDatabase() {
         await client.close();
     }
 }
+async function sendLog(log) {
+    let url = `${CONFIG.MICROSERVICE.securityService.address}/api/micro/logs/register-preview`;
+    axios.post(url, log, { headers: { "auth": CONFIG.SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
+}
+async function sendReport(report) {
+    let body = { micro: "register-preview", ...report };
+    let url = `${CONFIG.MICROSERVICE.masterService.address}/api/micro/report`;
+
+    axios.post(url, body, { headers: { "auth": CONFIG.SECURITY.CURRENT_KEY } })
+        .catch(log_helper.error);
+}
 
 
-//SECTION: main app service
+//SECTION: web service
+function lockDatabase() {
+    databaseRegisterClassIntense = true;
+}
+function releaseDatabase() {
+    databaseRegisterClassIntense = false;
+}
+
 async function dbFindMany(term = "", classIds = []) {
     let result = { success: true, body: [], };
     if (!validateTermParam(term, result)) return result;
 
     try {
         let query = { maLop: { $in: classIds } };
-        let cursor = databaseClient.collection(`${term}-register-class`).find(query);
+        let cursor = databaseRegisterClassClient.collection(`${term}-register-class`).find(query);
         await cursor.forEach(e => {
             result.body.push(e);
         });
@@ -454,7 +485,7 @@ async function dbGuessClasses(term = "", classIds = []) {
             return { maLop: { $regex: new RegExp(`${id}.*`) } };
         });
         let query = { $or: or };
-        let cursor = databaseClient.collection(`${term}-register-class`).find(query);
+        let cursor = databaseRegisterClassClient.collection(`${term}-register-class`).find(query);
         await cursor.forEach(e => result.body.push(e));
 
     } catch (e) {
@@ -466,168 +497,6 @@ async function dbGuessClasses(term = "", classIds = []) {
     return result;
 }
 
-
-//SECTION: database instense
-async function dbReformatAll(term = "") {
-    let result = { success: true, body: -1 };
-    if (!validateTermParam(term, result)) return result;
-
-    lockDatabase();
-    try {
-        let collection = databaseClient.collection(`${term}-register-class`);
-        let cursor = collection.find();
-        let reformatCount = 0;
-        let promises = [];
-        await cursor.forEach(async (studyClass) => {
-            let maLop = studyClass.maLop;
-            let promise = new Promise((resolve, reject) => {
-                try {
-                    let filter = { maLop: maLop };
-                    delete studyClass._id;
-                    reformatClassProperty(studyClass);
-                    let update = { $set: { ...studyClass } };
-
-                    collection.updateMany(filter, update, (err, result) => {
-                        if (err) {
-                            reject("MaLop: " + maLop + ", " + err);
-                            return;
-                        }
-                        reformatCount += result.matchedCount;
-                        resolve();
-                    });
-                } catch (e) {
-                    reject("MaLop: " + maLop + ", " + e);
-                }
-            }).catch(log_helper.error);
-            promises.push(promise);
-        });
-        await Promise.all(promises);
-        result.body = reformatCount;
-
-    } catch (e) {
-        log_helper.error(e);
-        result.success = false;
-        result.body = e;
-    }
-    releaseDatabase();
-
-    let bodyReport = { micro: "register-preview", ...result };
-    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
-
-    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
-        .catch(log_helper.error);
-}
-async function dbFindDuplicate(term = "") {
-    let result = { success: true, body: {} };
-    if (!validateTermParam(term, result)) return result;
-
-    lockDatabase();
-    try {
-        let collection = databaseClient.collection(`${term}-register-class`);
-        let cursor = collection.find();
-        let duplicateCount = 0;
-        let duplicateCases = [];
-        let promises = [];
-        await cursor.forEach(async (studyClass) => {
-            let promise = new Promise(async (resolve, reject) => {
-                let maLop = studyClass.maLop;
-                let filter = { maLop: maLop };
-                let check = collection.find(filter);
-                if (await check.count() != 1) {
-                    if (!duplicateCases.includes(maLop)) {
-                        duplicateCount++;
-                        duplicateCases.push(maLop);
-                    }
-                }
-                resolve();
-            });
-            promises.push(promise);
-        });
-        await Promise.all(promises);
-
-        result.body.count = duplicateCount;
-        result.body.cases = duplicateCases;
-
-    } catch (e) {
-        log_helper.error(e);
-        result.success = false;
-        result.body = e;
-    }
-    releaseDatabase();
-
-    let bodyReport = { micro: "register-preview", ...result };
-    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
-
-    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
-        .catch(log_helper.error);
-}
-async function dbClearExamSchedule(term = "", end = true) {
-    let result = { success: true, body: [] };
-    if (!validateTermParam(term, result)) return result;
-
-    lockDatabase();
-    try {
-        let collection = databaseClient.collection(`${term}-register-class`);
-        let cursor = collection.find();
-        let count = 0;
-        let promises = [];
-        await cursor.forEach((studyClass) => {
-            promises.push(new Promise((resolve, reject) => {
-                let maLop = studyClass.maLop;
-                let updateQuery = end ? { $set: { thiCuoiKi: [] } } : { $set: { thiGiuaKi: [] } };
-                collection.updateMany({ maLop: maLop }, updateQuery, (e, updateResult) => {
-                    if (e) {
-                        result.body.push("MaLop: " + maLop + " " + e);
-                        resolve();
-                        return;
-                    }
-                    count += updateResult.matchedCount;
-                    resolve();
-                });
-            }));
-        });
-        await Promise.all(promises);
-        result.body.push("Done: count=" + count);
-
-    } catch (e) {
-        log_helper.error(e);
-        result.success = false;
-        result.body.push(String(e));
-    }
-    releaseDatabase();
-
-    let bodyReport = { micro: "register-preview", ...result };
-    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
-
-    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
-        .catch(log_helper.error);
-}
-async function dbClearRegisterClass(term = "") {
-    let result = { success: true, body: {} };
-    if (!validateTermParam(term, result)) return result;
-
-    lockDatabase();
-    try {
-        let collection = databaseClient.collection(`${term}-register-class`);
-        let deleteResult = await collection.deleteMany({});
-        result.body.count = deleteResult.deletedCount;
-
-    } catch (e) {
-        log_helper.error(e);
-        result.success = false;
-        result.body = e;
-    }
-    releaseDatabase();
-
-    let bodyReport = { micro: "register-preview", ...result };
-    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
-
-    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
-        .catch(log_helper.error);
-}
-
-
-//SECTION: database instense
 async function dbUpsertRegisterClass(term, csvName) {
     let result = { success: true, body: [] };
     if (!validateTermParam(term, result)) return result;
@@ -638,7 +507,7 @@ async function dbUpsertRegisterClass(term, csvName) {
         let count = 0;
         let promises = [];
         let maLopSet = new Set();
-        let collection = databaseClient.collection(`${term}-register-class`);
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
         async function insertClassFromRow(row) {
             return new Promise(async (resolve, reject) => {
                 let maLop = reformatString(row["#maLop"]);
@@ -647,6 +516,7 @@ async function dbUpsertRegisterClass(term, csvName) {
 
                 let lopHocNew = {
                     maLop: maLop,
+                    maLopKem: row["#maLopKem"],
                     loaiLop: row["#loaiLop"],
                     maHocPhan: row["#maHocPhan"],
                     tenHocPhan: row["#tenHocPhan"],
@@ -744,11 +614,8 @@ async function dbUpsertRegisterClass(term, csvName) {
     releaseDatabase();
 
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
-    let bodyReport = { micro: "register-preview", ...result };
-    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
-
-    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
-        .catch(log_helper.error);
+    sendReport(result);
+    sendLog(result);
 }
 async function dbUpsertMidExam(term, firstWeekDay, csvName) {
     let result = { success: true, body: [] };
@@ -760,7 +627,7 @@ async function dbUpsertMidExam(term, firstWeekDay, csvName) {
         let count = 0;
         let promises = [];
         let maLopSet = new Set();
-        let collection = databaseClient.collection(`${term}-register-class`);
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
         async function insertClassFromRow(row) {
             return new Promise(async (resolve, reject) => {
                 let maLop = reformatString(row["#maLop"]);
@@ -881,11 +748,8 @@ async function dbUpsertMidExam(term, firstWeekDay, csvName) {
     releaseDatabase();
 
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
-    let bodyReport = { micro: "register-preview", ...result };
-    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
-
-    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
-        .catch(log_helper.error);
+    sendReport(result);
+    sendLog(result);
 }
 async function dbUpsertEndExam(term, firstWeekDay, csvName) {
     let result = { success: true, body: [] };
@@ -897,7 +761,7 @@ async function dbUpsertEndExam(term, firstWeekDay, csvName) {
         let count = 0;
         let promises = [];
         let maLopSet = new Set();
-        let collection = databaseClient.collection(`${term}-register-class`);
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
         async function insertClassFromRow(row) {
             return new Promise(async (resolve, reject) => {
                 let maLop = reformatString(row["#maLop"]);
@@ -1018,17 +882,193 @@ async function dbUpsertEndExam(term, firstWeekDay, csvName) {
     releaseDatabase();
 
     log_helper.info("UpsertRegisterClass: " + JSON.stringify(result));
-    let bodyReport = { micro: "register-preview", ...result };
-    let urlReport = `${CONFIG.masterService.address}/api/micro/report`;
-
-    axios.post(urlReport, bodyReport, { headers: { "auth": SECURITY.CURRENT_KEY } })
-        .catch(log_helper.error);
+    sendReport(result);
+    sendLog(result);
 }
 
+async function dbClearMidExam(term = "") {
+    let result = { success: true, body: [] };
+    if (!validateTermParam(term, result)) return result;
+
+    lockDatabase();
+    try {
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
+        let cursor = collection.find();
+        let count = 0;
+        let promises = [];
+        await cursor.forEach((studyClass) => {
+            promises.push(new Promise((resolve, reject) => {
+                let maLop = studyClass.maLop;
+                let updateQuery = { $set: { thiGiuaKi: [] } };
+                collection.updateMany({ maLop: maLop }, updateQuery, (e, updateResult) => {
+                    if (e) {
+                        result.body.push("MaLop: " + maLop + " " + e);
+                        resolve();
+                        return;
+                    }
+                    count += updateResult.matchedCount;
+                    resolve();
+                });
+            }));
+        });
+        await Promise.all(promises);
+        result.body.push("Done: count=" + count);
+
+    } catch (e) {
+        log_helper.error(e);
+        result.success = false;
+        result.body.push(String(e));
+    }
+    releaseDatabase();
+
+    sendReport(result);
+}
+async function dbClearEndExam(term = "") {
+    let result = { success: true, body: [] };
+    if (!validateTermParam(term, result)) return result;
+
+    lockDatabase();
+    try {
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
+        let cursor = collection.find();
+        let count = 0;
+        let promises = [];
+        await cursor.forEach((studyClass) => {
+            promises.push(new Promise((resolve, reject) => {
+                let maLop = studyClass.maLop;
+                let updateQuery = { $set: { thiCuoiKi: [] } };
+                collection.updateMany({ maLop: maLop }, updateQuery, (e, updateResult) => {
+                    if (e) {
+                        result.body.push("MaLop: " + maLop + " " + e);
+                        resolve();
+                        return;
+                    }
+                    count += updateResult.matchedCount;
+                    resolve();
+                });
+            }));
+        });
+        await Promise.all(promises);
+        result.body.push("Done: count=" + count);
+
+    } catch (e) {
+        log_helper.error(e);
+        result.success = false;
+        result.body.push(String(e));
+    }
+    releaseDatabase();
+
+    sendReport(result);
+}
+async function dbClearRegisterClass(term = "") {
+    let result = { success: true, body: {} };
+    if (!validateTermParam(term, result)) return result;
+
+    lockDatabase();
+    try {
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
+        let deleteResult = await collection.deleteMany({});
+        result.body.count = deleteResult.deletedCount;
+
+    } catch (e) {
+        log_helper.error(e);
+        result.success = false;
+        result.body = e;
+    }
+    releaseDatabase();
+
+    sendReport(result);
+}
+
+async function dbReformatAll(term = "") {
+    let result = { success: true, body: -1 };
+    if (!validateTermParam(term, result)) return result;
+
+    lockDatabase();
+    try {
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
+        let cursor = collection.find();
+        let reformatCount = 0;
+        let promises = [];
+        await cursor.forEach(async (studyClass) => {
+            let maLop = studyClass.maLop;
+            let promise = new Promise((resolve, reject) => {
+                try {
+                    let filter = { maLop: maLop };
+                    delete studyClass._id;
+                    reformatClassProperty(studyClass);
+                    let update = { $set: { ...studyClass } };
+
+                    collection.updateMany(filter, update, (err, result) => {
+                        if (err) {
+                            reject("MaLop: " + maLop + ", " + err);
+                            return;
+                        }
+                        reformatCount += result.matchedCount;
+                        resolve();
+                    });
+                } catch (e) {
+                    reject("MaLop: " + maLop + ", " + e);
+                }
+            }).catch(log_helper.error);
+            promises.push(promise);
+        });
+        await Promise.all(promises);
+        result.body = reformatCount;
+
+    } catch (e) {
+        log_helper.error(e);
+        result.success = false;
+        result.body = e;
+    }
+    releaseDatabase();
+
+    sendReport(result);
+}
+async function dbFindDuplicate(term = "") {
+    let result = { success: true, body: {} };
+    if (!validateTermParam(term, result)) return result;
+
+    lockDatabase();
+    try {
+        let collection = databaseRegisterClassClient.collection(`${term}-register-class`);
+        let cursor = collection.find();
+        let duplicateCount = 0;
+        let duplicateCases = [];
+        let promises = [];
+        await cursor.forEach(async (studyClass) => {
+            let promise = new Promise(async (resolve, reject) => {
+                let maLop = studyClass.maLop;
+                let filter = { maLop: maLop };
+                let check = collection.find(filter);
+                if (await check.count() != 1) {
+                    if (!duplicateCases.includes(maLop)) {
+                        duplicateCount++;
+                        duplicateCases.push(maLop);
+                    }
+                }
+                resolve();
+            });
+            promises.push(promise);
+        });
+        await Promise.all(promises);
+
+        result.body.count = duplicateCount;
+        result.body.cases = duplicateCases;
+
+    } catch (e) {
+        log_helper.error(e);
+        result.success = false;
+        result.body = e;
+    }
+    releaseDatabase();
+
+    sendReport(result);
+}
 
 process.on("exit", disconnectDatabase);
 async function main() {
-    loadConfig().then(() => {
+    loadAllConfig().then(() => {
         connectDatabase().then(() => {
             initServer().catch(log_helper.error);
         }).catch(log_helper.error);

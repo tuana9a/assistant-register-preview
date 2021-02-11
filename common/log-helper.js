@@ -7,7 +7,7 @@ function timeFormat(date = new Date()) {
     let timeString = (hour < 10 ? "0" : "") + hour + ":" + (minute < 10 ? "0" : "") + minute + ":" + (second < 10 ? "0" : "") + second;
     return timeString;
 }
-function dateFormate(date = new Date()) {
+function dateFormat(date = new Date()) {
     let day = date.getDate();
     let month = date.getMonth() + 1;//EXPLAIN: range: 0-11
     let year = date.getFullYear();
@@ -17,26 +17,33 @@ function dateFormate(date = new Date()) {
 
 async function info(data) {
     let now = new Date();
-    let fileName = dateFormate(now) + ".log";
+    let fileName = dateFormat(now) + ".log";
     let timeStamp = timeFormat(now);
     data = timeStamp + " [INFO] " + data + "\n";
     fs.appendFile("./logs/" + fileName, data, () => { });
 }
 async function error(data) {
     let now = new Date();
-    let fileName = dateFormate(now) + ".log";
+    let fileName = dateFormat(now) + ".log";
     let timeStamp = timeFormat(now);
     data = timeStamp + " [ERROR] " + data + "\n";
     fs.appendFile("./logs/" + fileName, data, () => { });
 }
 async function log(data) {
     let now = new Date();
-    let fileName = dateFormate(now) + ".log";
+    let fileName = dateFormat(now) + ".log";
     let timeStamp = timeFormat(now);
     data = timeStamp + " [LOG] " + data + "\n";
     fs.appendFile("./logs/" + fileName, data, () => { });
 }
 
+function toLog(type = "INFO", data) {
+    let now = new Date();
+    let timeStamp = timeFormat(now);
+    data = `${timeStamp} [${type}] ${data}`;
+}
+
+module.exports.toLog = toLog;
 module.exports.info = info;
 module.exports.error = error;
 module.exports.log = log;
