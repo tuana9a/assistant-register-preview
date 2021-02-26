@@ -4,6 +4,7 @@ config/*local.json
 resource/*
 !resource/helloworld.txt
 *test*
+out/*
 *.code-workspace
 
 # Logs
