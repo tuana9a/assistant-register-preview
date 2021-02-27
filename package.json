@@ -10,14 +10,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/gemdino/register-preview-service.git"
+    "url": "git+https://github.com/tuana9a/assistant-register-preview.git"
   },
   "author": "Nguyen Minh Tuan",
   "license": "GPL-3.0",
   "bugs": {
-    "url": "https://github.com/gemdino/register-preview-service/issues"
+    "url": "https://github.com/tuana9a/assistant-register-preview/issues"
   },
-  "homepage": "https://github.com/gemdino/register-preview-service#readme",
+  "homepage": "https://github.com/tuana9a/assistant-register-preview#readme",
   "dependencies": {
     "axios": "^0.21.1",
     "csv-parser": "^3.0.0",
