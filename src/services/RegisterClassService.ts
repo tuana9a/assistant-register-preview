@@ -17,7 +17,7 @@ export class RegisterClassService {
         this.busy = false;
     }
 
-    async findByTermAndIds_In(term: string, ids: Array<number>) {
+    async findClassesByTermAndIds_In(term: string, ids: Array<number>) {
         let classes: Array<LopHoc> = [];
         let result = new ResponseEntity();
         try {
@@ -33,7 +33,7 @@ export class RegisterClassService {
         }
         return result;
     }
-    async findByTermAndIds_Near(term: string, ids: Array<number>) {
+    async findClassesByTermAndIds_Near(term: string, ids: Array<number>) {
         let classes: Array<LopHoc> = [];
         let result = new ResponseEntity();
         try {
@@ -101,7 +101,6 @@ export class RegisterClassService {
             result.body = e;
         }
         this.imFree();
-
         return result;
     }
     async updateClasses_EndExam(term: string, classes: Array<LopHoc>) {
@@ -121,7 +120,6 @@ export class RegisterClassService {
             result.body = e;
         }
         this.imFree();
-
         return result;
     }
 

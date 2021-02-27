@@ -11,16 +11,16 @@ export class StudentRegisterView {
         service = studentRegisterService;
     }
 
-    async findStudentRegister(req: Request, resp: Response) {
+    async findStudentByTermAndMssv(req: Request, resp: Response) {
         let mssv = fromAnyToNumber(reformatString(String(req.query.mssv)));
         let term = reformatString(String(req.query.term));
 
         resp.setHeader('Content-Type', 'application/json; charset=utf-8');
-        let result = await service.findByTermAndMssv(term, mssv);
+        let result = await service.findStudentByTermAndMssv(term, mssv);
 
         resp.send(result);
     }
-    async crawlStudentRegister(req: Request, resp: Response) {
+    async crawlManyStudents(req: Request, resp: Response) {
         let term = reformatString(String(req.query.term));
         let start = fromAnyToNumber(reformatString(String(req.query.start)));
         let end = fromAnyToNumber(reformatString(String(req.query.end)));

@@ -22,21 +22,18 @@ export class StudentRegisterService {
         this.busy = false;
     }
 
-    async findByTermAndMssv(term: string, mssv: number) {
-        let students: Array<SinhVien> = [];
+    async findStudentByTermAndMssv(term: string, mssv: number) {
+        let student: SinhVien;
         let result = new ResponseEntity();
         try {
             let filter = { mssv: mssv };
-            await db
-                .collection(`${term}-student-register`)
-                .find(filter)
-                .forEach((each: SinhVien) => students.push(each));
-            result.body = students;
+            student = await db.collection(`${term}-student-register`).findOne(filter);
+            result.body = student;
         } catch (e) {
             result.success = false;
             result.body = e;
         }
-        return students;
+        return result;
     }
 
     async crawlManyStudents(term: string, start: number, end: number, cookie: string) {

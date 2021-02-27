@@ -29,10 +29,10 @@ export class RegisterClassView {
         let result = new ResponseEntity();
         switch (type) {
             case 'match':
-                result = await service.findByTermAndIds_In(term, ids);
+                result = await service.findClassesByTermAndIds_In(term, ids);
                 break;
             case 'near':
-                result = await service.findByTermAndIds_Near(term, ids);
+                result = await service.findClassesByTermAndIds_Near(term, ids);
                 break;
         }
 
