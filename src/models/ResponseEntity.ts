@@ -1,5 +1,5 @@
 export class ResponseEntity {
     success: boolean = true;
-    body: any = "none";
-    constructor() { }
+    body: any = 'none';
+    constructor() {}
 }

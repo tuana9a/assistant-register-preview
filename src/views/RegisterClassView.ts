@@ -7,45 +7,34 @@ import { LopHoc } from '../models/RegisterClass';
 import { readCsvAsync } from '../utils/csv-parser';
 import { reformatString } from '../utils/reformat';
 import { fromAnyToNumber, fromMapToArray_Value } from '../utils/convert';
+import { ResponseEntity } from '../models/ResponseEntity';
+
+var service: RegisterClassService;
 
 export class RegisterClassView {
-    service: RegisterClassService;
-
-    constructor(service: RegisterClassService) {
-        this.service = service;
+    constructor(registerClassService: RegisterClassService) {
+        service = registerClassService;
     }
 
-    async findClasses(req: Request, resp: Response) {
+    async findClassesByTermAndIds(req: Request, resp: Response) {
         let ids = reformatString(String(req.query.ids))
             .split(/\s*,\s*|\s+/)
             .map((e) => e.replace(/\D+/g, ''))
             .filter((e) => e.match(/^\d+$/))
             .map((e) => fromAnyToNumber(e));
         let term = reformatString(String(req.query.term));
+        let type = reformatString(String(req.query.type));
 
         resp.setHeader('Content-Type', 'application/json; charset=utf-8');
-        let result = await this.service.findByTermAndIds(term, ids);
-
-        resp.send(result);
-    }
-    async findClasses_Regex(req: Request, resp: Response) {
-        let ids = reformatString(String(req.query.ids))
-            .split(/\s*,\s*|\s+/)
-            .map((e) => e.replace(/\D+/g, ''))
-            .filter((e) => e.match(/^\d+$/))
-            .map((e) => fromAnyToNumber(e));
-        let term = reformatString(String(req.query.term));
-
-        resp.setHeader('Content-Type', 'application/json; charset=utf-8');
-        let result = await this.service.findByTermAndIds_Regex(term, ids);
-
-        resp.send(result);
-    }
-    async findDuplicate(req: Request, resp: Response) {
-        let term = reformatString(String(req.query.term));
-
-        resp.setHeader('Content-Type', 'application/json; charset=utf-8');
-        let result = await this.service.findDuplicate(term);
+        let result = new ResponseEntity();
+        switch (type) {
+            case 'match':
+                result = await service.findByTermAndIds_In(term, ids);
+                break;
+            case 'near':
+                result = await service.findByTermAndIds_Near(term, ids);
+                break;
+        }
 
         resp.send(result);
     }
@@ -81,17 +70,17 @@ export class RegisterClassView {
                     lopHoc.maHocPhan = reformatString(row['#maHocPhan']);
                     lopHoc.tenHocPhan = reformatString(row['#tenHocPhan']);
                     lopHoc.ghiChu = reformatString(row['#ghiChu']);
-                    lopHoc.cacBuoiHoc = [buoiHoc];
+                    lopHoc.addBuoiHoc(buoiHoc);
 
                     if (classes.has(maLop)) {
                         classes.get(maLop).addBuoiHoc(buoiHoc);
                     } else {
                         classes.set(maLop, lopHoc);
                     }
-                } catch (ignored) { }
+                } catch (ignored) {}
             });
 
-            this.service.updateClasses(term, fromMapToArray_Value(classes));
+            service.updateClasses(term, fromMapToArray_Value(classes));
         } else {
             result.body = 'no file';
         }
@@ -119,7 +108,7 @@ export class RegisterClassView {
                     nhomThi.thuThi = reformatString(row['#thuThi']);
                     nhomThi.kipThi = reformatString(row['#kipThi']);
                     nhomThi.ngayThi = reformatString(row['#ngayThi']);
-                    nhomThi.tuanThi = reformatString(row['tuanThi']);
+                    nhomThi.tuanThi = reformatString(row['#tuanThi']);
                     nhomThi.phongThi = reformatString(row['#phongThi']);
                     nhomThi._timestamp = Date.now();
 
@@ -132,10 +121,9 @@ export class RegisterClassView {
                     } else {
                         classes.set(maLop, lopHoc);
                     }
-                } catch (ignored) { }
+                } catch (ignored) {}
             });
-
-            this.service.updateClasses_MidExam(term, fromMapToArray_Value(classes));
+            service.updateClasses_MidExam(term, fromMapToArray_Value(classes));
         } else {
             result.body = 'no file';
         }
@@ -163,7 +151,7 @@ export class RegisterClassView {
                     nhomThi.thuThi = reformatString(row['#thuThi']);
                     nhomThi.kipThi = reformatString(row['#kipThi']);
                     nhomThi.ngayThi = reformatString(row['#ngayThi']);
-                    nhomThi.tuanThi = reformatString(row['tuanThi']);
+                    nhomThi.tuanThi = reformatString(row['#tuanThi']);
                     nhomThi.phongThi = reformatString(row['#phongThi']);
                     nhomThi._timestamp = Date.now();
 
@@ -176,10 +164,10 @@ export class RegisterClassView {
                     } else {
                         classes.set(maLop, lopHoc);
                     }
-                } catch (ignored) { }
+                } catch (ignored) {}
             });
 
-            this.service.updateClasses_EndExam(term, fromMapToArray_Value(classes));
+            service.updateClasses_EndExam(term, fromMapToArray_Value(classes));
         } else {
             result.body = 'no file';
         }
@@ -192,7 +180,7 @@ export class RegisterClassView {
         resp.setHeader('Content-Type', 'application/json; charset=utf-8');
 
         let result = { success: true, body: 'working on it' };
-        this.service.deleteClasses(term);
+        service.deleteClasses(term);
 
         resp.send(result);
     }
@@ -201,7 +189,7 @@ export class RegisterClassView {
         resp.setHeader('Content-Type', 'application/json; charset=utf-8');
 
         let result = { success: true, body: 'working on it' };
-        this.service.deleteClasses_MidExam(term);
+        service.deleteClasses_MidExam(term);
 
         resp.send(result);
     }
@@ -210,7 +198,7 @@ export class RegisterClassView {
         resp.setHeader('Content-Type', 'application/json; charset=utf-8');
 
         let result = { success: true, body: 'working on it' };
-        this.service.deleteClasses_EndExam(term);
+        service.deleteClasses_EndExam(term);
 
         resp.send(result);
     }

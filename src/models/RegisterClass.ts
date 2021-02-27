@@ -8,10 +8,10 @@ export class LopHoc {
     cacBuoiHoc: Array<LopHoc.BuoiHoc> = [];
     thiGiuaKi: Array<LopHoc.NhomThi> = [];
     thiCuoiKi: Array<LopHoc.NhomThi> = [];
-    constructor(object: any = {}) {
-        for (const key in this) {
-            this[key] = object[key];
-        }
+    constructor() {
+        this.cacBuoiHoc = [];
+        this.thiGiuaKi = [];
+        this.thiCuoiKi = [];
     }
 
     addBuoiHoc(newBuoiHoc: LopHoc.BuoiHoc) {
@@ -71,11 +71,7 @@ export namespace LopHoc {
         thoiGianHoc: string;
         tuanHoc: string;
         _timestamp: number;
-        constructor(object: any = {}) {
-            for (const key in this) {
-                this[key] = object[key];
-            }
-        }
+        constructor() {}
     }
     export class NhomThi {
         name: string;
@@ -85,10 +81,6 @@ export namespace LopHoc {
         phongThi: string;
         tuanThi: string;
         _timestamp: number;
-        constructor(object: any = {}) {
-            for (const key in this) {
-                this[key] = object[key];
-            }
-        }
+        constructor() {}
     }
 }

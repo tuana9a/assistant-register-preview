@@ -7,11 +7,12 @@ import { reformatString } from '../utils/reformat';
 import { fromAnyToNumber } from '../utils/convert';
 import { ResponseEntity } from '../models/ResponseEntity';
 
+var db: Db;
+
 export class StudentRegisterService {
-    db: Db;
     busy: boolean;
-    constructor(dbRegisterClass: Db) {
-        this.db = dbRegisterClass;
+    constructor(dbStudentRegister: Db) {
+        db = dbStudentRegister;
     }
 
     imBusy() {
@@ -26,7 +27,7 @@ export class StudentRegisterService {
         let result = new ResponseEntity();
         try {
             let filter = { mssv: mssv };
-            await this.db
+            await db
                 .collection(`${term}-student-register`)
                 .find(filter)
                 .forEach((each: SinhVien) => students.push(each));
@@ -50,7 +51,7 @@ export class StudentRegisterService {
         var WINDOW_SIZE = MIN_SIZE;
 
         let CRASH = false;
-        let collection = this.db.collection(`${term}-student-register`);
+        let collection = db.collection(`${term}-student-register`);
 
         let count = 0;
         let timer = Date.now();
@@ -75,11 +76,7 @@ export class StudentRegisterService {
                         }
 
                         if (student.hoTen) {
-                            collection.updateOne(
-                                { mssv: mssv },
-                                { $set: { ...student } },
-                                { upsert: true }
-                            );
+                            collection.updateOne({ mssv: mssv }, { $set: { ...student } }, { upsert: true });
                             count++;
                         }
                     })
@@ -114,10 +111,7 @@ export class StudentRegisterService {
         form.append('ctl00_ctl00_contentPane_MainPanel_MainContent_cbTermID_VI', term);
         form.append('ctl00$ctl00$contentPane$MainPanel$MainContent$cbTermID', term);
         form.append('ctl00$ctl00$contentPane$MainPanel$MainContent$tbStudentID', String(mssv));
-        form.append(
-            '__CALLBACKID',
-            'ctl00$ctl00$contentPane$MainPanel$MainContent$gvStudentRegister'
-        );
+        form.append('__CALLBACKID', 'ctl00$ctl00$contentPane$MainPanel$MainContent$gvStudentRegister');
         form.append('__CALLBACKPARAM', `c0:KV|2;[];GB|27;14|CUSTOMCALLBACK8|${mssv};`);
         form.append('__VIEWSTATE', __VIEWSTATE);
 

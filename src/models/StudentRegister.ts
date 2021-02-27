@@ -2,10 +2,11 @@ export class SinhVien {
     mssv: number;
     hoTen: string;
     ngaySinh: string;
-    dangKi: Array<SinhVien.DangKi>;
+    dangKi: Array<SinhVien.DangKi> = [];
     _timestamp: number;
-
-    constructor() {}
+    constructor() {
+        this.dangKi = [];
+    }
 
     addDangKi(dangKi: SinhVien.DangKi) {
         this.dangKi.push(dangKi);
@@ -16,7 +17,6 @@ export namespace SinhVien {
         maLop: number;
         maLopThi: number;
         nhom: string;
-
         constructor() {}
     }
 }

@@ -1,4 +1,9 @@
 import { App } from './app';
 
-const app = new App('./config');
-app.run();
+async function main() {
+    const app = new App();
+    await app.setup();
+    app.run();
+}
+
+main();
