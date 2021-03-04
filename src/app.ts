@@ -23,13 +23,13 @@ async function loadConfig(CONFIG: any, configfolder: string, name: string) {
             if (err) {
                 path = `${configfolder}/${name}.json`;
                 fs.readFile(path, 'utf-8', (_err, data) => {
-                    console.log(` * ${name}.json`);
+                    console.log(` * config: ${name}.json`);
                     CONFIG[`${name}`] = JSON.parse(data);
                     resolve(undefined);
                 });
                 return;
             }
-            console.log(` * ${name}-local.json`);
+            console.log(` * config: ${name}-local.json`);
             CONFIG[`${name}`] = JSON.parse(data);
             resolve(undefined);
         });
@@ -72,7 +72,7 @@ export class App {
             mongoClient = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
             await mongoClient.connect(); // Connect the client to the server
             await mongoClient.db('test').command({ ping: 1 }); // Establish and verify connection
-            console.log(' * database connected'); //CAUTION: update các service, view sau connect database;
+            console.log(' * database: ' + url); //CAUTION: update các service, view sau connect database;
 
             registerClassService = new RegisterClassService(mongoClient.db('register-class'));
             registerClassView = new RegisterClassView(registerClassService);
@@ -80,7 +80,7 @@ export class App {
             studentRegisterService = new StudentRegisterService(mongoClient.db('student-register'));
             studentRegisterView = new StudentRegisterView(studentRegisterService);
         } catch (err) {
-            console.log(' * database connect FAILED: ' + err);
+            console.log(' * database: FAILED: ' + err);
         }
 
         app.use(express.json());
@@ -103,6 +103,6 @@ export class App {
     async run() {
         let port = process.env.PORT || CONFIG.server.port;
         app.listen(port).on('error', console.error);
-        console.log(` * http://localhost:${port}`);
+        console.log(` * listen: http://localhost:${port}`);
     }
 }

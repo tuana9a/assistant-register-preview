@@ -3,8 +3,9 @@ config/*local.json
 *.cmd
 resource/*
 !resource/helloworld.txt
-*test*
 *.code-workspace
+
+*test*
 
 # Logs
 logs/*.log
