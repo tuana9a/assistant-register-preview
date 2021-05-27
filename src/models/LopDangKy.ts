@@ -1,20 +1,20 @@
-export class LopHoc {
+export class LopDangKy {
     maLop: number;
     maLopKem: number;
     loaiLop: string;
     maHocPhan: string;
     tenHocPhan: string;
     ghiChu: string;
-    cacBuoiHoc: Array<LopHoc.BuoiHoc> = [];
-    thiGiuaKi: Array<LopHoc.NhomThi> = [];
-    thiCuoiKi: Array<LopHoc.NhomThi> = [];
+    cacBuoiHoc: Array<LopDangKy.BuoiHoc> = [];
+    thiGiuaKi: Array<LopDangKy.NhomThi> = [];
+    thiCuoiKi: Array<LopDangKy.NhomThi> = [];
     constructor() {
         this.cacBuoiHoc = [];
         this.thiGiuaKi = [];
         this.thiCuoiKi = [];
     }
 
-    addBuoiHoc(newBuoiHoc: LopHoc.BuoiHoc) {
+    addBuoiHoc(newBuoiHoc: LopDangKy.BuoiHoc) {
         let exist = false;
         this.cacBuoiHoc = this.cacBuoiHoc.map(function (existBuoiHoc) {
             //EXPLAIN: nếu cần cập nhật thì sẽ vào block trong cùng
@@ -30,7 +30,7 @@ export class LopHoc {
 
         if (!exist) this.cacBuoiHoc.push(newBuoiHoc);
     }
-    addThiGiuaKi(newNhomThi: LopHoc.NhomThi) {
+    addThiGiuaKi(newNhomThi: LopDangKy.NhomThi) {
         let exist = false;
         this.thiGiuaKi = this.thiGiuaKi.map(function (existNhomThi) {
             //EXPLAIN: nếu cần cập nhật thì sẽ vào block trong cùng
@@ -46,7 +46,7 @@ export class LopHoc {
 
         if (!exist) this.thiGiuaKi.push(newNhomThi);
     }
-    addThiCuoiKi(newNhomThi: LopHoc.NhomThi) {
+    addThiCuoiKi(newNhomThi: LopDangKy.NhomThi) {
         let exist = false;
         this.thiCuoiKi = this.thiCuoiKi.map(function (existNhomThi) {
             //EXPLAIN: nếu cần cập nhật thì sẽ vào block trong cùng
@@ -63,7 +63,7 @@ export class LopHoc {
         if (!exist) this.thiCuoiKi.push(newNhomThi);
     }
 }
-export namespace LopHoc {
+export namespace LopDangKy {
     export class BuoiHoc {
         name: string;
         thuHoc: string;

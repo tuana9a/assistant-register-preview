@@ -1,19 +1,19 @@
-export class SinhVien {
+export class SinhVienDangKy {
     mssv: number;
     hoTen: string;
     ngaySinh: string;
-    dangKi: Array<SinhVien.DangKi> = [];
+    dangKi: Array<SinhVienDangKy.DangKy> = [];
     _timestamp: number;
     constructor() {
         this.dangKi = [];
     }
 
-    addDangKi(dangKi: SinhVien.DangKi) {
-        this.dangKi.push(dangKi);
+    addDangKy(dangKy: SinhVienDangKy.DangKy) {
+        this.dangKi.push(dangKy);
     }
 }
-export namespace SinhVien {
-    export class DangKi {
+export namespace SinhVienDangKy {
+    export class DangKy {
         maLop: number;
         maLopThi: number;
         nhom: string;

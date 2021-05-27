@@ -2,49 +2,30 @@ import { Db } from 'mongodb';
 import axios from 'axios';
 import jsdom from 'jsdom';
 
-import { SinhVien } from '../models/StudentRegister';
-import { reformatString } from '../utils/reformat';
-import { fromAnyToNumber } from '../utils/convert';
+import { SinhVienDangKy } from '../models/SinhVienDangKy';
 import { ResponseEntity } from '../models/ResponseEntity';
+import { utils } from '../utils/Utils';
+import { dbFactory } from './DbFactory';
 
-var db: Db;
+var db: Db = dbFactory.dbSinhVienDangKy;
 
-export class StudentRegisterService {
+class SinhVienDangKyService {
     busy: boolean;
-    constructor(dbStudentRegister: Db) {
-        db = dbStudentRegister;
+    setBusy(value: boolean) {
+        this.busy = value;
     }
-
-    imBusy() {
-        this.busy = true;
-    }
-    imFree() {
-        this.busy = false;
-    }
-
     async findStudentByTermAndMssv(term: string, mssv: number) {
-        let student: SinhVien;
-        let result = new ResponseEntity();
-        try {
-            let filter = { mssv: mssv };
-            student = await db.collection(`${term}-student-register`).findOne(filter);
-            result.body = student;
-        } catch (e) {
-            result.success = false;
-            result.body = e;
-        }
-        return result;
+        let filter = { mssv: mssv };
+        let student = await db.collection(`${term}-student-register`).findOne(filter);
+        return ResponseEntity.builder().code(1).message('success').data(student).build();
     }
-
     async crawlManyStudents(term: string, start: number, end: number, cookie: string) {
-        if (this.busy) return;
-        this.imBusy();
-
+        this.setBusy(true);
         console.log('crawl start: ' + new Date().toTimeString());
         console.log({ term, start, end });
 
-        var MAX_SIZE = 20,
-            MIN_SIZE = 5;
+        var MIN_SIZE = 5;
+        var MAX_SIZE = 20;
         var WINDOW_SIZE = MIN_SIZE;
 
         let CRASH = false;
@@ -61,7 +42,7 @@ export class StudentRegisterService {
 
                 let mssv = iterator; //CAUTION:không dùng iterator vì callback sẽ dùng sai
                 let promise = this.crawlStudent(term, mssv, cookie)
-                    .then((student: SinhVien) => {
+                    .then((student: SinhVienDangKy) => {
                         let took = Date.now() - timer;
                         if (took > 700 || took < 350) {
                             console.log(`window_size=${WINDOW_SIZE} mssv=${mssv} took=${took}`);
@@ -83,13 +64,11 @@ export class StudentRegisterService {
             }
             await Promise.all(promises);
         }
-
         if (CRASH) console.log('crash, mssv=' + iterator + ', err=' + CRASH);
         let took = Math.round((Date.now() - timer) / 60_000);
         let result = { took: took + 'min', count: count, mssv: iterator, err: CRASH };
         console.log(result);
-
-        this.imFree();
+        this.setBusy(false);
     }
     async crawlStudent(term: string, mssv: number, cookie: string) {
         const URL = 'https://ctt-sis.hust.edu.vn/pub/CheckClassRegister.aspx';
@@ -116,7 +95,7 @@ export class StudentRegisterService {
             let timeout = setTimeout(reject, 15_000);
             axios.post(URL, form, { headers: HEADERS }).then(async (resp) => {
                 try {
-                    let student = new SinhVien();
+                    let student = new SinhVienDangKy();
                     student._timestamp = Date.now();
 
                     const document = new jsdom.JSDOM(resp.data).window.document;
@@ -128,15 +107,15 @@ export class StudentRegisterService {
                     rows.forEach((row) => {
                         let columns = row.querySelectorAll('.dxgv');
 
-                        student.hoTen = reformatString(columns[2].textContent);
-                        student.ngaySinh = reformatString(columns[3].textContent);
+                        student.hoTen = utils.reformatString(columns[2].textContent);
+                        student.ngaySinh = utils.reformatString(columns[3].textContent);
 
-                        let dangKi = new SinhVien.DangKi();
-                        dangKi.maLop = fromAnyToNumber(reformatString(columns[4].textContent));
-                        dangKi.nhom = reformatString(columns[5].textContent);
-                        dangKi.maLopThi = fromAnyToNumber(reformatString(columns[9].textContent));
+                        let dangKi = new SinhVienDangKy.DangKy();
+                        dangKi.maLop = utils.fromAnyToNumber(utils.reformatString(columns[4].textContent));
+                        dangKi.nhom = utils.reformatString(columns[5].textContent);
+                        dangKi.maLopThi = utils.fromAnyToNumber(utils.reformatString(columns[9].textContent));
 
-                        student.addDangKi(dangKi);
+                        student.addDangKy(dangKi);
                     });
                     resolve(student);
                 } catch (e) {
@@ -147,3 +126,5 @@ export class StudentRegisterService {
         });
     }
 }
+
+export const sinhVienDangKyService = new SinhVienDangKyService();
