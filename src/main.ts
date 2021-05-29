@@ -6,6 +6,7 @@ import { lopDangKyView } from './views/LopDangKyView';
 import { sinhVienDangKyView } from './views/SinhVIenDangKyView';
 import { requestFilter } from './security/RequestFilter';
 import { dbFactory } from './services/DbFactory';
+import { askMasterService } from './services/AskMasterService';
 
 class App {
     CONFIG: any = {};
@@ -29,14 +30,13 @@ class App {
     setConfig(path: string, value: string) {
         let paths = path.split('.');
         let length = paths.length;
-        let pointer = this.CONFIG;
-        let i = 0;
-        while (i != length - 1) {
-            pointer = pointer[paths[i]];
-            if (!pointer) pointer = {};
-            i++;
-        }
-        pointer[paths[length - 1]] = value;
+        let p = paths.reduce(function (pointer: any, cur: string, i: number) {
+            if (i == length - 1) return pointer;
+            let check = pointer[cur];
+            if (!check) pointer[cur] = {};
+            return pointer[cur];
+        }, this.CONFIG);
+        p[paths[length - 1]] = value;
     }
     autoConfig(configFolder: string) {
         let filenames = fs.readdirSync(configFolder);
@@ -46,6 +46,12 @@ class App {
                 this.loadConfig(name, configFolder + '/' + filename);
             }
         }
+    }
+    getWorkerAddress(name: string) {
+        return this.getConfig('workers.address.' + name);
+    }
+    setWorkerAddress(name: string, address: string) {
+        this.setConfig('workers.address.' + name, address);
     }
 }
 
@@ -70,3 +76,12 @@ dbFactory.init();
 let port = process.env.PORT || app.getConfig('server.port');
 server.listen(port).on('error', console.error);
 console.log(` * listen: ${app.getConfig('server.address')}`);
+
+setInterval(function () {
+    let from = {
+        name: 'assistant-school-register-preview',
+        address: app.getConfig('server.address')
+    };
+    let asks = ['assistant-school-register-preview'];
+    askMasterService.askWorkerAddress(from, asks);
+}, 5000);

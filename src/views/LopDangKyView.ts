@@ -19,7 +19,7 @@ class LopDangKyView {
         resp.setHeader('Content-Type', 'application/json; charset=utf-8');
 
         try {
-            let result = lopDangKyService.findClassesByTermAndIds(term, ids, type);
+            let result = await lopDangKyService.findClassesByTermAndIds(term, ids, type);
             resp.send(result);
         } catch (e) {
             resp.send(ResponseEntity.builder().code(-1).message('failed').data({}).build());

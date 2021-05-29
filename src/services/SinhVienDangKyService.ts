@@ -7,19 +7,19 @@ import { ResponseEntity } from '../models/ResponseEntity';
 import { utils } from '../utils/Utils';
 import { dbFactory } from './DbFactory';
 
-var db: Db = dbFactory.dbSinhVienDangKy;
-
 class SinhVienDangKyService {
     busy: boolean;
     setBusy(value: boolean) {
         this.busy = value;
     }
     async findStudentByTermAndMssv(term: string, mssv: number) {
+        var db: Db = dbFactory.dbSinhVienDangKy;
         let filter = { mssv: mssv };
         let student = await db.collection(`${term}-student-register`).findOne(filter);
         return ResponseEntity.builder().code(1).message('success').data(student).build();
     }
     async crawlManyStudents(term: string, start: number, end: number, cookie: string) {
+        var db: Db = dbFactory.dbSinhVienDangKy;
         this.setBusy(true);
         console.log('crawl start: ' + new Date().toTimeString());
         console.log({ term, start, end });
