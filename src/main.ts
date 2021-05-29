@@ -53,6 +53,14 @@ class App {
     setWorkerAddress(name: string, address: string) {
         this.setConfig('workers.address.' + name, address);
     }
+    async askMaster() {
+        let from = {
+            name: 'assistant-school-register-preview',
+            address: app.getConfig('server.address')
+        };
+        let asks = ['assistant-school-register-preview'];
+        return askMasterService.askWorkerAddress(from, asks);
+    }
 }
 
 export const app = new App();
@@ -77,11 +85,8 @@ let port = process.env.PORT || app.getConfig('server.port');
 server.listen(port).on('error', console.error);
 console.log(` * listen: ${app.getConfig('server.address')}`);
 
-setInterval(function () {
-    let from = {
-        name: 'assistant-school-register-preview',
-        address: app.getConfig('server.address')
-    };
-    let asks = ['assistant-school-register-preview'];
-    askMasterService.askWorkerAddress(from, asks);
-}, 5000);
+async function intervalAskMaster() {
+    await app.askMaster();
+    setTimeout(intervalAskMaster, 10_000);
+}
+intervalAskMaster();

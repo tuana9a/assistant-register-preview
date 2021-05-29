@@ -18,7 +18,7 @@ class LopDangKyService {
                 break;
             case 'near':
                 filter = {
-                    $or: ids.map((id) => {
+                    $or: ids.map(function (id) {
                         let length = String(id).length;
                         let missing = 6 - length;
                         let filter: FilterQuery<any> = { maLop: id };

@@ -5,7 +5,7 @@ import { utils } from '../utils/Utils';
 class LopDangKyCsvService {
     async getClassesFromCsv_BuoiHoc(filepath: string) {
         let classes = new Map<number, LopDangKy>();
-        await csvUtils.readCsvAsync(filepath, (row) => {
+        await csvUtils.readCsvAsync(filepath, function (row) {
             try {
                 let maLop = utils.fromAnyToNumber(utils.reformatString(row['#maLop']));
 
@@ -37,7 +37,7 @@ class LopDangKyCsvService {
     }
     async getClassesFromCsv_ThiCuoiKi(filepath: string) {
         let classes = new Map<number, LopDangKy>();
-        await csvUtils.readCsvAsync(filepath, (row) => {
+        await csvUtils.readCsvAsync(filepath, function (row) {
             try {
                 let maLop = utils.fromAnyToNumber(utils.reformatString(row['#maLop']));
 
@@ -65,7 +65,7 @@ class LopDangKyCsvService {
     }
     async getClassesFromCsv_ThiGiuaKi(filepath: string) {
         let classes = new Map<number, LopDangKy>();
-        await csvUtils.readCsvAsync(filepath, (row) => {
+        await csvUtils.readCsvAsync(filepath, function (row) {
             try {
                 let maLop = utils.fromAnyToNumber(utils.reformatString(row['#maLop']));
 

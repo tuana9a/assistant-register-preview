@@ -42,7 +42,7 @@ class SinhVienDangKyService {
 
                 let mssv = iterator; //CAUTION:không dùng iterator vì callback sẽ dùng sai
                 let promise = this.crawlStudent(term, mssv, cookie)
-                    .then((student: SinhVienDangKy) => {
+                    .then(function (student: SinhVienDangKy) {
                         let took = Date.now() - timer;
                         if (took > 700 || took < 350) {
                             console.log(`window_size=${WINDOW_SIZE} mssv=${mssv} took=${took}`);
@@ -91,9 +91,9 @@ class SinhVienDangKyService {
         form.append('__CALLBACKPARAM', `c0:KV|2;[];GB|27;14|CUSTOMCALLBACK8|${mssv};`);
         form.append('__VIEWSTATE', __VIEWSTATE);
 
-        return new Promise((resolve, reject) => {
+        return new Promise(function (resolve, reject) {
             let timeout = setTimeout(reject, 15_000);
-            axios.post(URL, form, { headers: HEADERS }).then(async (resp) => {
+            axios.post(URL, form, { headers: HEADERS }).then(async function (resp) {
                 try {
                     let student = new SinhVienDangKy();
                     student._timestamp = Date.now();
@@ -104,7 +104,7 @@ class SinhVienDangKyService {
                     );
                     let rows = Array.from(table.querySelectorAll('.dxgvDataRow_Mulberry'));
 
-                    rows.forEach((row) => {
+                    rows.forEach(function (row) {
                         let columns = row.querySelectorAll('.dxgv');
 
                         student.hoTen = utils.reformatString(columns[2].textContent);

@@ -23,7 +23,7 @@ class AskMasterService {
                 }
             })
             .catch(function (err) {
-                console.error('ask master failed');
+                console.error(new Date().toTimeString() + ' ask master failed');
             });
     }
 }
