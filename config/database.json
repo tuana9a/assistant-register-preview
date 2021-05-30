@@ -1,5 +1,5 @@
 {
-    "address": "localhost:27017",
-    "username": "",
-    "password": ""
+    "address": "localhost",
+    "username": "admin",
+    "password": "1234"
 }

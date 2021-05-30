@@ -2,7 +2,7 @@ import axios from 'axios';
 import { app } from '../main';
 
 class AskMasterService {
-    async askWorkerAddress(from: any, names: Array<string>) {
+    async askWorkerAddress(url: string, from: any, names: Array<string>) {
         let data = {
             from,
             asks: names
@@ -10,7 +10,6 @@ class AskMasterService {
         let headers = {
             'Content-Type': 'application/json; charset=utf-8'
         };
-        let url = `${app.getConfig('server.master-address')}/api/worker/ask/worker-address`;
         return axios
             .post(url, data, { headers })
             .then(function (response) {

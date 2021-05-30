@@ -5,7 +5,7 @@ import express from 'express';
 import { lopDangKyView } from './views/LopDangKyView';
 import { sinhVienDangKyView } from './views/SinhVIenDangKyView';
 import { requestFilter } from './security/RequestFilter';
-import { dbFactory } from './services/DbFactory';
+import { DbConfig, dbFactory } from './services/DbFactory';
 import { askMasterService } from './services/AskMasterService';
 
 class App {
@@ -54,15 +54,17 @@ class App {
         this.setConfig('workers.address.' + name, address);
     }
     async askMaster() {
+        let url = `${app.getConfig('server.master-address')}/api/worker/ask/worker-address`;
         let from = {
             name: 'assistant-school-register-preview',
             address: app.getConfig('server.address')
         };
         let asks = ['assistant-school-register-preview'];
-        return askMasterService.askWorkerAddress(from, asks);
+        return askMasterService.askWorkerAddress(url, from, asks);
     }
 }
 
+//SECTION: init application
 export const app = new App();
 app.autoConfig('./config');
 
@@ -80,10 +82,17 @@ server.delete('/api/admin/classes/end-exam', lopDangKyView.deleteClasses_EndExam
 server.get('/api/public/student', sinhVienDangKyView.findStudentByTermAndMssv);
 server.post('/api/admin/students/crawl-register', sinhVienDangKyView.crawlManyStudents);
 
-dbFactory.init();
 let port = process.env.PORT || app.getConfig('server.port');
 server.listen(port).on('error', console.error);
 console.log(` * listen: ${app.getConfig('server.address')}`);
+
+//EXPLAIN: CONNECT DB
+const dbconfig: DbConfig = {
+    address: app.getConfig('database.address'),
+    username: app.getConfig('database.username'),
+    password: app.getConfig('database.password')
+};
+dbFactory.init(dbconfig);
 
 async function intervalAskMaster() {
     await app.askMaster();

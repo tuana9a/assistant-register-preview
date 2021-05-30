@@ -3,13 +3,15 @@ import { LopDangKy } from '../models/LopDangKy';
 import { ResponseEntity } from '../models/ResponseEntity';
 import { dbFactory } from './DbFactory';
 
+const DB_NAME = 'register-class';
+
 class LopDangKyService {
     busy: boolean;
     setBusy(value: boolean) {
         this.busy = value;
     }
     async findClassesByTermAndIds(term: string, ids: Array<number>, type: string) {
-        var db: Db = dbFactory.dbLopDangKy;
+        var db: Db = dbFactory.getDb(DB_NAME);
         let classes: Array<LopDangKy> = [];
         let filter: FilterQuery<any> = { maLop: -1 };
         switch (type) {
@@ -42,7 +44,7 @@ class LopDangKyService {
         return ResponseEntity.builder().code(1).message('success').data(classes).build();
     }
     async updateClasses(term: string, classes: Array<LopDangKy>) {
-        var db: Db = dbFactory.dbLopDangKy;
+        var db: Db = dbFactory.getDb(DB_NAME);
         this.setBusy(true);
         let count = 0;
         let collection = db.collection(`${term}-register-class`);
@@ -56,7 +58,7 @@ class LopDangKyService {
         return ResponseEntity.builder().code(1).message('success').data(count).build();
     }
     async updateClasses_MidExam(term: string, classes: Array<LopDangKy>) {
-        var db: Db = dbFactory.dbLopDangKy;
+        var db: Db = dbFactory.getDb(DB_NAME);
         this.setBusy(true);
         let count = 0;
         let collection = db.collection(`${term}-register-class`);
@@ -68,7 +70,7 @@ class LopDangKyService {
         return ResponseEntity.builder().code(1).message('success').data(count).build();
     }
     async updateClasses_EndExam(term: string, classes: Array<LopDangKy>) {
-        var db: Db = dbFactory.dbLopDangKy;
+        var db: Db = dbFactory.getDb(DB_NAME);
         this.setBusy(true);
         let count = 0;
         let collection = db.collection(`${term}-register-class`);
@@ -80,21 +82,21 @@ class LopDangKyService {
         return ResponseEntity.builder().code(1).message('success').data(count).build();
     }
     async deleteClasses(term: string) {
-        var db: Db = dbFactory.dbLopDangKy;
+        var db: Db = dbFactory.getDb(DB_NAME);
         let collection = db.collection(`${term}-register-class`);
         let operationResult = await collection.deleteMany({});
         let count = operationResult.deletedCount;
         return ResponseEntity.builder().code(1).message('success').data(count).build();
     }
     async deleteClasses_MidExam(term: string) {
-        var db: Db = dbFactory.dbLopDangKy;
+        var db: Db = dbFactory.getDb(DB_NAME);
         let collection = db.collection(`${term}-register-class`);
         let operationResult = await collection.updateMany({}, { $set: { thiGiuaKi: [] } });
         let count = operationResult.modifiedCount;
         return ResponseEntity.builder().code(1).message('success').data(count).build();
     }
     async deleteClasses_EndExam(term: string) {
-        var db: Db = dbFactory.dbLopDangKy;
+        var db: Db = dbFactory.getDb(DB_NAME);
         let collection = db.collection(`${term}-register-class`);
         let operationResult = await collection.updateMany({}, { $set: { thiCuoiKi: [] } });
         let count = operationResult.modifiedCount;
