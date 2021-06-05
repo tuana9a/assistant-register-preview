@@ -1,6 +1,7 @@
 # custom
 config/*local.json
 *.cmd
+*.sh
 resource/*
 !resource/helloworld.txt
 *.code-workspace

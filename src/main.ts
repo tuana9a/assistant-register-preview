@@ -21,11 +21,13 @@ class App {
     }
     getConfig(path: string) {
         let paths = path.split('.');
-        return paths.reduce(function (pointer: any, cur: string) {
-            let check = pointer[cur];
-            if (!check) pointer[cur] = {};
-            return pointer[cur];
-        }, this.CONFIG);
+        try {
+            return paths.reduce(function (pointer: any, cur: string) {
+                return pointer[cur];
+            }, this.CONFIG);
+        } catch (e) {
+            return '';
+        }
     }
     setConfig(path: string, value: string) {
         let paths = path.split('.');
