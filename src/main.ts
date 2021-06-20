@@ -1,35 +1,26 @@
-import fs from 'fs';
 import multer from 'multer';
 import express from 'express';
 
 import { lopDangKyView } from './views/LopDangKyView';
 import { sinhVienDangKyView } from './views/SinhVIenDangKyView';
 import { requestFilter } from './security/RequestFilter';
-import { DbConfig, dbFactory } from './services/DbFactory';
+import { dbFactory } from './services/DbFactory';
 import { askMasterService } from './services/AskMasterService';
+import { CONFIG } from './config/AppConfig';
 
 class App {
-    CONFIG: any = {};
-    loadConfig(name: string, path: string) {
-        try {
-            let data = fs.readFileSync(path, { flag: 'r', encoding: 'utf-8' });
-            this.CONFIG[`${name}`] = JSON.parse(data);
-            console.log(` * config: ${path}: SUCCESS`);
-        } catch (e) {
-            console.log(` * config: ${path}: FAILED`);
-        }
-    }
-    getConfig(path: string) {
+    private RUNTIME: any = {};
+    getRuntime(path: string) {
         let paths = path.split('.');
         try {
             return paths.reduce(function (pointer: any, cur: string) {
                 return pointer[cur];
-            }, this.CONFIG);
+            }, this.RUNTIME);
         } catch (e) {
             return '';
         }
     }
-    setConfig(path: string, value: string) {
+    setRuntime(path: string, value: string) {
         let paths = path.split('.');
         let length = paths.length;
         let p = paths.reduce(function (pointer: any, cur: string, i: number) {
@@ -37,39 +28,21 @@ class App {
             let check = pointer[cur];
             if (!check) pointer[cur] = {};
             return pointer[cur];
-        }, this.CONFIG);
+        }, this.RUNTIME);
         p[paths[length - 1]] = value;
     }
-    autoConfig(configFolder: string) {
-        let filenames = fs.readdirSync(configFolder);
-        for (let filename of filenames) {
-            if (filename.match(/.json$/)) {
-                let name = filename.slice(0, -5);
-                this.loadConfig(name, configFolder + '/' + filename);
-            }
-        }
-    }
     getWorkerAddress(name: string) {
-        return this.getConfig('workers.address.' + name);
+        return this.getRuntime('workers.address.' + name);
     }
     setWorkerAddress(name: string, address: string) {
-        this.setConfig('workers.address.' + name, address);
-    }
-    async askMaster() {
-        let url = `${app.getConfig('server.master-address')}/api/worker/ask/worker-address`;
-        let from = {
-            name: 'assistant-school-register-preview',
-            address: app.getConfig('server.address')
-        };
-        let asks = ['assistant-school-register-preview'];
-        return askMasterService.askWorkerAddress(url, from, asks);
+        this.setRuntime('workers.address.' + name, address);
     }
 }
 
 //SECTION: init application
 export const app = new App();
-app.autoConfig('./config');
 
+dbFactory.init(); // connect db
 const server = express();
 const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 server.use(express.json());
@@ -84,20 +57,22 @@ server.delete('/api/admin/classes/end-exam', lopDangKyView.deleteClasses_EndExam
 server.get('/api/public/student', sinhVienDangKyView.findStudentByTermAndMssv);
 server.post('/api/admin/students/crawl-register', sinhVienDangKyView.crawlManyStudents);
 
-let port = process.env.PORT || app.getConfig('server.port');
+let port = process.env.PORT || CONFIG.SERVER.PORT;
 server.listen(port).on('error', console.error);
-console.log(` * listen: ${app.getConfig('server.address')}`);
+console.log(` * listen: ${CONFIG.SERVER.ADDRESS}`);
 
-//EXPLAIN: CONNECT DB
-const dbconfig: DbConfig = {
-    address: app.getConfig('database.address'),
-    username: app.getConfig('database.username'),
-    password: app.getConfig('database.password')
-};
-dbFactory.init(dbconfig);
-
+async function askMaster() {
+    let url = `${CONFIG.SERVER.MASTER_ADDRESS}/api/worker/ask/worker-address`;
+    let from = {
+        name: CONFIG.SERVER.NAME,
+        address: CONFIG.SERVER.ADDRESS
+    };
+    let asks = [CONFIG.SERVER.NAME];
+    return askMasterService.askWorkerAddress(url, from, asks);
+}
 async function intervalAskMaster() {
-    await app.askMaster();
+    await askMaster();
     setTimeout(intervalAskMaster, 10_000);
 }
+
 intervalAskMaster();

@@ -1,12 +1,7 @@
-# custom
-config/*local.json
-*.cmd
-*.sh
-resource/*
-!resource/helloworld.txt
-*.code-workspace
-
+# tuana9a
 *test*
+resource/*.csv
+*.code-workspace
 
 # Logs
 logs/*.log

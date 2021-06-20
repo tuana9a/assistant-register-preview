@@ -17,12 +17,12 @@ class AskMasterService {
                 if (masterResponse.code == 1) {
                     let data = masterResponse.data;
                     names.forEach(function (name) {
-                        app.setConfig(`workers.address.${name}`, data[name]);
+                        app.setRuntime(`workers.address.${name}`, data[name]);
                     });
                 }
             })
             .catch(function (err) {
-                console.error(new Date().toTimeString() + ' ask master failed');
+                console.error(` * [FAILED] ask master at: ${new Date().toISOString()}`);
             });
     }
 }
