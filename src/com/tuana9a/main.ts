@@ -57,17 +57,17 @@ server.delete('/api/admin/classes/end-exam', lopDangKyView.deleteClasses_EndExam
 server.get('/api/public/student', sinhVienDangKyView.findStudentByTermAndMssv);
 server.post('/api/admin/students/crawl-register', sinhVienDangKyView.crawlManyStudents);
 
-let port = process.env.PORT || CONFIG.SERVER.PORT;
+let port = process.env.PORT || CONFIG.server.port;
 server.listen(port).on('error', console.error);
-console.log(` * listen: ${CONFIG.SERVER.ADDRESS}`);
+console.log(` * listen: ${CONFIG.server.address}`);
 
 async function askMaster() {
-    let url = `${CONFIG.SERVER.MASTER_ADDRESS}/api/worker/ask/worker-address`;
+    let url = `${CONFIG.master.address}/api/worker/ask/worker-address`;
     let from = {
-        name: CONFIG.SERVER.NAME,
-        address: CONFIG.SERVER.ADDRESS
+        name: CONFIG.worker.name,
+        address: CONFIG.server.address
     };
-    let asks = [CONFIG.SERVER.NAME];
+    let asks = [CONFIG.worker.name];
     return askMasterService.askWorkerAddress(url, from, asks);
 }
 async function intervalAskMaster() {

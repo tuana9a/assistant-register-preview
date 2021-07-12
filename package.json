@@ -1,24 +1,9 @@
 {
-  "name": "assistant-school-register-preview",
+  "name": "register-preview.hust-assistant.com",
   "version": "1.0.0",
-  "description": "",
-  "main": "src/main.ts",
   "scripts": {
-    "start": "node dist/main.js",
-    "build": "tsc --build",
-    "clean": "tsc --build --clean",
-    "reformat-code": "prettier --config .prettierrc src/**/*.ts --write"
+    "start": "node dist/com/tuana9a/main.js"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/tuana9a/assistant-register-preview.git"
-  },
-  "author": "Nguyen Minh Tuan",
-  "license": "GPL-3.0",
-  "bugs": {
-    "url": "https://github.com/tuana9a/assistant-register-preview/issues"
-  },
-  "homepage": "https://github.com/tuana9a/assistant-register-preview#readme",
   "dependencies": {
     "axios": "^0.21.1",
     "csv-parser": "^3.0.0",
@@ -31,7 +16,6 @@
     "@types/express": "^4.17.11",
     "@types/jsdom": "^16.2.6",
     "@types/mongodb": "^3.6.8",
-    "@types/multer": "^1.4.5",
-    "typescript": "^4.2.2"
+    "@types/multer": "^1.4.5"
   }
 }

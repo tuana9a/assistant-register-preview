@@ -1,7 +1,9 @@
 # tuana9a
 *test*
-resource/*.csv
+resource/
 *.code-workspace
+*.cmd
+*.sh
 
 # Logs
 logs/*.log
