@@ -1,5 +1,5 @@
 import { Db, MongoClient } from 'mongodb';
-import { CONFIG } from '../config/AppConfig';
+import { AppConfig } from '../config/AppConfig';
 
 class DbFactory {
     mongoClient: MongoClient;
@@ -7,9 +7,9 @@ class DbFactory {
     DB_STUDENT_REGISTER: Db;
 
     async init() {
-        let address = CONFIG.database.address;
-        let username = CONFIG.database.username;
-        let password = CONFIG.database.password;
+        let address = AppConfig.database.address;
+        let username = AppConfig.database.username;
+        let password = AppConfig.database.password;
 
         let url = '';
         if (username == '') {
@@ -22,8 +22,8 @@ class DbFactory {
         this.mongoClient = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
         await this.mongoClient.connect();
         await this.mongoClient.db('test').command({ ping: 1 }); // Establish and verify connection
-        this.DB_REGISTER_CLASS = this.mongoClient.db(CONFIG.database.db_register_class);
-        this.DB_STUDENT_REGISTER = this.mongoClient.db(CONFIG.database.db_student_register);
+        this.DB_REGISTER_CLASS = this.mongoClient.db(AppConfig.database.db_register_class);
+        this.DB_STUDENT_REGISTER = this.mongoClient.db(AppConfig.database.db_student_register);
         console.log(' * database: ' + url);
     }
 }

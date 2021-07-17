@@ -5,42 +5,7 @@ import { lopDangKyView } from './views/LopDangKyView';
 import { sinhVienDangKyView } from './views/SinhVIenDangKyView';
 import { requestFilter } from './security/RequestFilter';
 import { dbFactory } from './services/DbFactory';
-import { askMasterService } from './services/AskMasterService';
-import { CONFIG } from './config/AppConfig';
-
-class App {
-    private RUNTIME: any = {};
-    getRuntime(path: string) {
-        let paths = path.split('.');
-        try {
-            return paths.reduce(function (pointer: any, cur: string) {
-                return pointer[cur];
-            }, this.RUNTIME);
-        } catch (e) {
-            return '';
-        }
-    }
-    setRuntime(path: string, value: string) {
-        let paths = path.split('.');
-        let length = paths.length;
-        let p = paths.reduce(function (pointer: any, cur: string, i: number) {
-            if (i == length - 1) return pointer;
-            let check = pointer[cur];
-            if (!check) pointer[cur] = {};
-            return pointer[cur];
-        }, this.RUNTIME);
-        p[paths[length - 1]] = value;
-    }
-    getWorkerAddress(name: string) {
-        return this.getRuntime('workers.address.' + name);
-    }
-    setWorkerAddress(name: string, address: string) {
-        this.setRuntime('workers.address.' + name, address);
-    }
-}
-
-//SECTION: init application
-export const app = new App();
+import { AppConfig } from './config/AppConfig';
 
 dbFactory.init(); // connect db
 const server = express();
@@ -55,24 +20,8 @@ server.delete('/api/admin/classes', lopDangKyView.deleteClasses);
 server.delete('/api/admin/classes/mid-exam', lopDangKyView.deleteClasses_MidExam);
 server.delete('/api/admin/classes/end-exam', lopDangKyView.deleteClasses_EndExam);
 server.get('/api/public/student', sinhVienDangKyView.findStudentByTermAndMssv);
-server.post('/api/admin/students/crawl-register', sinhVienDangKyView.crawlManyStudents);
+server.post('/api/admin/students/crawl-register', sinhVienDangKyView.crawlStudents);
 
-let port = process.env.PORT || CONFIG.server.port;
+let port = process.env.PORT || AppConfig.server.port;
 server.listen(port).on('error', console.error);
-console.log(` * listen: ${CONFIG.server.address}`);
-
-async function askMaster() {
-    let url = `${CONFIG.master.address}/api/worker/ask/worker-address`;
-    let from = {
-        name: CONFIG.worker.name,
-        address: CONFIG.server.address
-    };
-    let asks = [CONFIG.worker.name];
-    return askMasterService.askWorkerAddress(url, from, asks);
-}
-async function intervalAskMaster() {
-    await askMaster();
-    setTimeout(intervalAskMaster, 10_000);
-}
-
-intervalAskMaster();
+console.log(` * listen: ${AppConfig.server.address}`);

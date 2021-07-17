@@ -39,7 +39,7 @@ class LopDangKyService {
             .collection(`${term}-register-class`)
             .find(filter)
             .forEach((each: LopDangKy) => classes.push(each));
-        return ResponseEntity.builder().code(1).message('success').data(classes).build();
+        return classes;
     }
     async updateClasses(term: string, classes: Array<LopDangKy>) {
         var db: Db = dbFactory.DB_REGISTER_CLASS;
@@ -53,7 +53,7 @@ class LopDangKyService {
             count++;
         }
         this.setBusy(false);
-        return ResponseEntity.builder().code(1).message('success').data(count).build();
+        return count;
     }
     async updateClasses_MidExam(term: string, classes: Array<LopDangKy>) {
         var db: Db = dbFactory.DB_REGISTER_CLASS;
@@ -65,7 +65,7 @@ class LopDangKyService {
             count++;
         }
         this.setBusy(false);
-        return ResponseEntity.builder().code(1).message('success').data(count).build();
+        return count;
     }
     async updateClasses_EndExam(term: string, classes: Array<LopDangKy>) {
         var db: Db = dbFactory.DB_REGISTER_CLASS;
@@ -77,28 +77,28 @@ class LopDangKyService {
             count++;
         }
         this.setBusy(false);
-        return ResponseEntity.builder().code(1).message('success').data(count).build();
+        return count;
     }
     async deleteClasses(term: string) {
         var db: Db = dbFactory.DB_REGISTER_CLASS;
         let collection = db.collection(`${term}-register-class`);
         let operationResult = await collection.deleteMany({});
         let count = operationResult.deletedCount;
-        return ResponseEntity.builder().code(1).message('success').data(count).build();
+        return count;
     }
     async deleteClasses_MidExam(term: string) {
         var db: Db = dbFactory.DB_REGISTER_CLASS;
         let collection = db.collection(`${term}-register-class`);
         let operationResult = await collection.updateMany({}, { $set: { thiGiuaKi: [] } });
         let count = operationResult.modifiedCount;
-        return ResponseEntity.builder().code(1).message('success').data(count).build();
+        return count;
     }
     async deleteClasses_EndExam(term: string) {
         var db: Db = dbFactory.DB_REGISTER_CLASS;
         let collection = db.collection(`${term}-register-class`);
         let operationResult = await collection.updateMany({}, { $set: { thiCuoiKi: [] } });
         let count = operationResult.modifiedCount;
-        return ResponseEntity.builder().code(1).message('success').data(count).build();
+        return count;
     }
 }
 

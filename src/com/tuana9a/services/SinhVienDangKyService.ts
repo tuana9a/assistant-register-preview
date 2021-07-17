@@ -16,9 +16,9 @@ class SinhVienDangKyService {
         var db: Db = dbFactory.DB_STUDENT_REGISTER;
         let filter = { mssv: mssv };
         let student = await db.collection(`${term}-student-register`).findOne(filter);
-        return ResponseEntity.builder().code(1).message('success').data(student).build();
+        return student;
     }
-    async crawlManyStudents(term: string, start: number, end: number, cookie: string) {
+    async crawlStudents(term: string, start: number, end: number, cookie: string) {
         var db: Db = dbFactory.DB_STUDENT_REGISTER;
         this.setBusy(true);
         console.log('crawl start: ' + new Date().toTimeString());
