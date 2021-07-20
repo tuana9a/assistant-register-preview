@@ -24,7 +24,7 @@ class DbFactory {
         await this.mongoClient.db('test').command({ ping: 1 }); // Establish and verify connection
         this.DB_REGISTER_CLASS = this.mongoClient.db(AppConfig.database.db_register_class);
         this.DB_STUDENT_REGISTER = this.mongoClient.db(AppConfig.database.db_student_register);
-        console.log(' * database: ' + url);
+        console.log(' * database: ' + address);
     }
 }
 
