@@ -3,7 +3,6 @@ import multer from 'multer';
 import express from 'express';
 
 import { lopDangKyView } from './views/LopDangKyView';
-import { sinhVienDangKyView } from './views/SinhVIenDangKyView';
 import { requestFilter } from './security/RequestFilter';
 import { dbFactory } from './services/DbFactory';
 import { AppConfig } from './config/AppConfig';
@@ -15,17 +14,11 @@ const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 server.use(cors());
 server.use(express.json());
 
-server.get('/api/public/classes', lopDangKyView.findClassesByTermAndIds);
-server.get('/api/public/student', sinhVienDangKyView.findStudentByTermAndMssv);
+server.post('/api/public/lop-dang-ky', lopDangKyView.findMany);
 
-server.all('/api/admin/*', requestFilter.authFilter);
-server.post('/api/admin/classes', upload.single('file'), lopDangKyView.updateClasses);
-server.post('/api/admin/classes/mid-exam', upload.single('file'), lopDangKyView.updateClasses_MidExam);
-server.post('/api/admin/classes/end-exam', upload.single('file'), lopDangKyView.updateClasses_EndExam);
-server.delete('/api/admin/classes', lopDangKyView.deleteClasses);
-server.delete('/api/admin/classes/mid-exam', lopDangKyView.deleteClasses_MidExam);
-server.delete('/api/admin/classes/end-exam', lopDangKyView.deleteClasses_EndExam);
-server.post('/api/admin/students/crawl-register', sinhVienDangKyView.crawlStudents);
+server.all('/api/admin/*', requestFilter.adminFilter);
+server.post('/api/admin/lop-dang-ky', upload.single('file'), lopDangKyView.insertMany);
+server.delete('/api/admin/lop-dang-ky', lopDangKyView.deleteMany);
 
 let port = process.env.PORT || AppConfig.server.port;
 server.listen(port).on('error', console.error);

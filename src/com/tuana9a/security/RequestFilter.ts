@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 
 class RequestFilter {
-    authFilter(req: Request, resp: Response, next: NextFunction) {
-        let auth = req.headers['auth'];
-        //TODO: filter with auth header
+    adminFilter(req: Request, resp: Response, next: NextFunction) {
+        let token = req.headers['Token'];
         next();
     }
 }

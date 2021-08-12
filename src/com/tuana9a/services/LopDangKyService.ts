@@ -1,103 +1,64 @@
-import { Db, FilterQuery } from 'mongodb';
 import { LopDangKy } from '../models/LopDangKy';
-import { ResponseEntity } from '../models/ResponseEntity';
 import { dbFactory } from './DbFactory';
+import { csvUtils } from '../utils/CsvUtils';
+import { AppConfig } from '../config/AppConfig';
+import { utils } from '../utils/Utils';
 
 class LopDangKyService {
-    busy: boolean;
-    setBusy(value: boolean) {
-        this.busy = value;
-    }
-    async findClassesByTermAndIds(term: string, ids: Array<number>, type: string) {
-        var db: Db = dbFactory.DB_REGISTER_CLASS;
-        let classes: Array<LopDangKy> = [];
-        let filter: FilterQuery<any> = { maLop: -1 };
-        switch (type) {
-            case 'match':
-                filter = { maLop: { $in: ids } };
-                break;
-            case 'near':
-                filter = {
-                    $or: ids.map(function (id) {
-                        let length = String(id).length;
-                        let missing = 6 - length;
-                        let filter: FilterQuery<any> = { maLop: id };
-                        if (missing > 0) {
-                            let delta = Math.pow(10, missing);
-                            let gte = id * delta;
-                            let lte = gte + delta;
-                            filter = { maLop: { $gte: gte, $lte: lte } };
-                        }
-                        return filter;
-                    })
-                };
-                break;
-            default:
-                break;
-        }
+    async findMany(term: string, filter = { ma_lop: -1 }) {
+        const db = dbFactory.DB_LOP_DANG_KY;
+        let result: Array<LopDangKy> = [];
+
         await db
-            .collection(`${term}-register-class`)
+            .collection(term)
             .find(filter)
-            .forEach((each: LopDangKy) => classes.push(each));
-        return classes;
+            .limit(AppConfig.mongodb.read.limit)
+            .forEach((each: LopDangKy) => result.push(each));
+        return result;
     }
-    async updateClasses(term: string, classes: Array<LopDangKy>) {
-        var db: Db = dbFactory.DB_REGISTER_CLASS;
-        this.setBusy(true);
+    async insertMany(term: string, filepath: string) {
+        const db = dbFactory.DB_LOP_DANG_KY;
         let count = 0;
-        let collection = db.collection(`${term}-register-class`);
-        for (let classs of classes) {
-            delete classs.thiGiuaKi;
-            delete classs.thiCuoiKi;
-            collection.updateOne({ maLop: classs.maLop }, { $set: { ...classs } }, { upsert: true });
-            count++;
+        let crash = false;
+        let batch: LopDangKy[] = [];
+
+        await csvUtils.readCsvAsync(filepath, async function (row) {
+            if (crash) return;
+            try {
+                let lopDangKy = new LopDangKy();
+
+                lopDangKy.ma_lop = utils.fromAnyToNumber(utils.reformatString(row[AppConfig.adapter.lopDangKy.ma_lop]));
+                lopDangKy.buoi_hoc_so = utils.fromAnyToNumber(utils.reformatString(row[AppConfig.adapter.lopDangKy.buoi_hoc_so]));
+
+                lopDangKy.thu_hoc = utils.reformatString(row[AppConfig.adapter.lopDangKy.thu_hoc]);
+                lopDangKy.phong_hoc = utils.reformatString(row[AppConfig.adapter.lopDangKy.phong_hoc]);
+                lopDangKy.thoi_gian_hoc = utils.reformatString(row[AppConfig.adapter.lopDangKy.thoi_gian_hoc]);
+                lopDangKy.tuan_hoc = utils.reformatString(row[AppConfig.adapter.lopDangKy.tuan_hoc]);
+
+                lopDangKy.ma_lop_kem = utils.fromAnyToNumber(utils.reformatString(row[AppConfig.adapter.lopDangKy.ma_lop]));
+                lopDangKy.loai_lop = utils.reformatString(row[AppConfig.adapter.lopDangKy.loai_lop]);
+                lopDangKy.ma_hoc_phan = utils.reformatString(row[AppConfig.adapter.lopDangKy.ma_hoc_phan]);
+                lopDangKy.ten_hoc_phan = utils.reformatString(row[AppConfig.adapter.lopDangKy.ten_hoc_phan]);
+                lopDangKy.ghi_chu = utils.reformatString(row[AppConfig.adapter.lopDangKy.ghi_chu]);
+
+                lopDangKy._timestamp = Date.now();
+                batch.push(lopDangKy);
+            } catch (e) {
+                console.error(e);
+                crash = true;
+            }
+        });
+        if (batch.length > 0) {
+            let result = await db.collection(term).insertMany(batch);
+            count += result.insertedCount;
         }
-        this.setBusy(false);
+        console.log(`inserted: ${count}`);
         return count;
     }
-    async updateClasses_MidExam(term: string, classes: Array<LopDangKy>) {
-        var db: Db = dbFactory.DB_REGISTER_CLASS;
-        this.setBusy(true);
-        let count = 0;
-        let collection = db.collection(`${term}-register-class`);
-        for (let classs of classes) {
-            collection.updateOne({ maLop: classs.maLop }, { $set: { thiGiuaKi: classs.thiGiuaKi } });
-            count++;
-        }
-        this.setBusy(false);
-        return count;
-    }
-    async updateClasses_EndExam(term: string, classes: Array<LopDangKy>) {
-        var db: Db = dbFactory.DB_REGISTER_CLASS;
-        this.setBusy(true);
-        let count = 0;
-        let collection = db.collection(`${term}-register-class`);
-        for (let classs of classes) {
-            collection.updateOne({ maLop: classs.maLop }, { $set: { thiCuoiKi: classs.thiCuoiKi } });
-            count++;
-        }
-        this.setBusy(false);
-        return count;
-    }
-    async deleteClasses(term: string) {
-        var db: Db = dbFactory.DB_REGISTER_CLASS;
-        let collection = db.collection(`${term}-register-class`);
-        let operationResult = await collection.deleteMany({});
-        let count = operationResult.deletedCount;
-        return count;
-    }
-    async deleteClasses_MidExam(term: string) {
-        var db: Db = dbFactory.DB_REGISTER_CLASS;
-        let collection = db.collection(`${term}-register-class`);
-        let operationResult = await collection.updateMany({}, { $set: { thiGiuaKi: [] } });
-        let count = operationResult.modifiedCount;
-        return count;
-    }
-    async deleteClasses_EndExam(term: string) {
-        var db: Db = dbFactory.DB_REGISTER_CLASS;
-        let collection = db.collection(`${term}-register-class`);
-        let operationResult = await collection.updateMany({}, { $set: { thiCuoiKi: [] } });
-        let count = operationResult.modifiedCount;
+    async deleteMany(term: string, filter = {}) {
+        const db = dbFactory.DB_LOP_DANG_KY;
+        let result = await db.collection(term).deleteMany(filter);
+        let count = result.deletedCount;
         return count;
     }
 }

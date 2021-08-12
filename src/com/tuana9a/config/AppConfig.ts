@@ -1,55 +1,32 @@
 import fs from 'fs';
 
-var config = {
+let config = {
     server: {
         address: '',
         port: -1
     },
-    worker: {
-        name: '',
-        ask: ['']
-    },
-    master: {
-        address: ''
-    },
     database: {
-        db_student_register: '',
-        db_register_class: '',
-        address: '',
-        username: '',
-        password: ''
+        db_lop_dang_ky: '',
+        connection_string: ''
     },
     adapter: {
         lopDangKy: {
-            buoiHoc: {
-                name: 'Buổi_Học_Số',
-                thuHoc: 'Thứ_Học',
-                phongHoc: 'Phòng_Học',
-                thoiGianHoc: 'Thời_Gian_Học',
-                tuanHoc: 'Tuần_Học'
-            },
-            nhomThiGiuaKy: {
-                name: 'Nhóm_Thi',
-                thuThi: 'Thứ_Thi',
-                kipThi: 'Kíp_Thi',
-                ngayThi: 'Ngày_Thi',
-                tuanThi: 'Tuần_Thi',
-                phongThi: 'Phòng_Thi'
-            },
-            nhomThiCuoiKy: {
-                name: 'Nhóm_Thi',
-                thuThi: 'Thứ_Thi',
-                kipThi: 'Kíp_Thi',
-                ngayThi: 'Ngày_Thi',
-                tuanThi: 'Tuần_Thi',
-                phongThi: 'Phòng_Thi'
-            },
-            maLop: 'Mã_Lớp',
-            maLopKem: 'Mã_Lớp_Kèm',
-            loaiLop: 'Loại_Lớp',
-            maHocPhan: 'Mã_HP',
-            tenHocPhan: 'Tên_HP',
-            ghiChu: 'Ghi_Chú'
+            buoi_hoc_so: '',
+            thu_hoc: '',
+            phong_hoc: '',
+            thoi_gian_hoc: '',
+            tuan_hoc: '',
+            ma_lop: '',
+            ma_lop_kem: '',
+            loai_lop: '',
+            ma_hoc_phan: '',
+            ten_hoc_phan: '',
+            ghi_chu: ''
+        }
+    },
+    mongodb: {
+        read: {
+            limit: 1
         }
     }
 };
