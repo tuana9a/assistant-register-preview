@@ -4,6 +4,8 @@ import { Request, Response } from 'express';
 import { utils } from '../utils/Utils';
 import { ResponseEntity } from '../models/ResponseEntity';
 import { lopDangKyService } from '../services/LopDangKyService';
+import { logUtils } from '../utils/LogUtils';
+import { AppConfig } from '../config/AppConfig';
 
 class Validate {
     is_term_ok(term: any) {
@@ -21,6 +23,7 @@ class LopDangKyView {
 
             if (validate.is_term_ok(term)) {
                 let result = await lopDangKyService.findMany(term, filter);
+
                 resp.setHeader('Content-Type', 'application/json; charset=utf-8');
                 resp.send(ResponseEntity.builder().code(1).message('success').data(result).build());
             } else {
@@ -28,7 +31,7 @@ class LopDangKyView {
                 resp.send(ResponseEntity.builder().code(0).message('term ?').build());
             }
         } catch (e) {
-            console.error(e);
+            logUtils.error(e);
             resp.setHeader('Content-Type', 'application/json; charset=utf-8');
             resp.send(ResponseEntity.builder().code(0).message('failed').data(e).build());
         }
@@ -40,19 +43,25 @@ class LopDangKyView {
 
             if (file && validate.is_term_ok(term)) {
                 let filename = file.originalname;
-                let filepath = './resource/' + filename;
+                let filepath = AppConfig.path.resource_dir + filename;
                 fs.writeFileSync(filepath, file.buffer, { flag: 'w' });
 
-                await lopDangKyService.insertMany(term, filepath);
+                let result = await lopDangKyService.insertMany(term, filepath);
 
                 resp.setHeader('Content-Type', 'application/json; charset=utf-8');
-                resp.send(ResponseEntity.builder().code(1).message('executing').build());
+                resp.send(ResponseEntity.builder().code(1).message('done').data(result).build());
             } else {
                 resp.setHeader('Content-Type', 'application/json; charset=utf-8');
-                resp.send(ResponseEntity.builder().code(0).message('missing something').data({ file: file.originalname, term }).build());
+                resp.send(
+                    ResponseEntity.builder()
+                        .code(0)
+                        .message('missing something')
+                        .data({ file: file ? true : false, term })
+                        .build()
+                );
             }
         } catch (e) {
-            console.error(e);
+            logUtils.error(e);
             resp.setHeader('Content-Type', 'application/json; charset=utf-8');
             resp.send(ResponseEntity.builder().code(0).message('failed').data(e).build());
         }
@@ -61,15 +70,16 @@ class LopDangKyView {
         try {
             let term = utils.reformatString(String(req.query.term));
             if (validate.is_term_ok(term)) {
-                lopDangKyService.deleteMany(term);
+                let result = await lopDangKyService.deleteMany(term);
+
                 resp.setHeader('Content-Type', 'application/json; charset=utf-8');
-                resp.send(ResponseEntity.builder().code(1).message('executing').build());
+                resp.send(ResponseEntity.builder().code(1).message('done').data(result).build());
             } else {
                 resp.setHeader('Content-Type', 'application/json; charset=utf-8');
                 resp.send(ResponseEntity.builder().code(0).message('term ?').build());
             }
         } catch (e) {
-            console.error(e);
+            logUtils.error(e);
             resp.setHeader('Content-Type', 'application/json; charset=utf-8');
             resp.send(ResponseEntity.builder().code(0).message('failed').data(e).build());
         }

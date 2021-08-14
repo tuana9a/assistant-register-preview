@@ -2,7 +2,7 @@
   "name": "register-preview.hust-assistant.com",
   "version": "1.0.0",
   "scripts": {
-    "start": "node dist/com/tuana9a/main.js"
+    "start": "node dist/main.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
