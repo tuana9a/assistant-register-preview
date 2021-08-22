@@ -14,11 +14,13 @@ const upload = multer({ limits: { fileSize: 10 * 1024 * 1024 } });
 server.use(cors());
 server.use(express.json());
 
-server.post('/api/public/lop-dang-ky', lopDangKyView.findMany);
+server.post('/api/find/many/lop-dang-ky', lopDangKyView.findMany);
 
-server.all('/api/admin/*', requestFilter.adminFilter);
-server.post('/api/admin/lop-dang-ky', upload.single('file'), lopDangKyView.insertMany);
-server.delete('/api/admin/lop-dang-ky', lopDangKyView.deleteMany);
+server.post('/api/insert/many/lop-dang-ky', requestFilter.adminFilter); 
+server.post('/api/insert/many/lop-dang-ky', upload.single('file'), lopDangKyView.insertMany);
+
+server.post('/api/delete/many/lop-dang-ky', requestFilter.adminFilter);
+server.post('/api/delete/many/lop-dang-ky', lopDangKyView.deleteMany);
 
 let port = process.env.PORT || AppConfig.server.port;
 server.listen(port).on('error', console.error);
