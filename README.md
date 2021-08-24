@@ -11,11 +11,11 @@ các bạn có thể <a href="https://github.com/tuana9a/tuana9a">liên hệ mì
 <pre>
 khi build src typecript toàn bộ nằm trong thư mục dist
 
--- root
-    |-- dist
-    |-- resource
-    |       |-- app-config.json
-    |-- src
+-- ./
+   |-- dist
+   |-- resource
+   |       |-- app-config.json
+   |-- src
 </pre>
 
 # #prepare

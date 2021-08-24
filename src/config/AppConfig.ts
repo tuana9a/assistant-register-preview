@@ -5,6 +5,9 @@ let config = {
         address: '',
         port: -1
     },
+    security: {
+        secret: ''
+    },
     database: {
         db_lop_dang_ky: '',
         connection_string: ''

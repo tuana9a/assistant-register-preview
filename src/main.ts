@@ -15,10 +15,8 @@ server.use(cors());
 server.use(express.json());
 
 server.post('/api/find/many/lop-dang-ky', lopDangKyView.findMany);
-
-server.post('/api/insert/many/lop-dang-ky', requestFilter.adminFilter); 
+server.post('/api/insert/many/lop-dang-ky', requestFilter.adminFilter);     
 server.post('/api/insert/many/lop-dang-ky', upload.single('file'), lopDangKyView.insertMany);
-
 server.post('/api/delete/many/lop-dang-ky', requestFilter.adminFilter);
 server.post('/api/delete/many/lop-dang-ky', lopDangKyView.deleteMany);
 
